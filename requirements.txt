@@ -1,0 +1,10 @@
+botocore
+requests
+boto3
+PyYAML
+tqdm
+sqlalchemy
+scikit-learn
+pymysql
+pandas
+numpy
