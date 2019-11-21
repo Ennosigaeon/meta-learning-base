@@ -6,6 +6,10 @@ import warnings
 from builtins import object, str
 from typing import Union, Any
 
+from sklearn.base import BaseEstimator
+
+from algorithm import ALGORITHMS
+from database import Database
 from utilities import ensure_directory
 
 warnings.filterwarnings('ignore')
@@ -50,7 +54,7 @@ class Worker(object):
         # load the Dataset from the database
         self.dataset = self.db.get_dataset(self.dataset.dataset_id)
 
-    def transform_dataset(self, algorithm: str, params: Dict) -> Union[str, Any]:
+    def transform_dataset(self, algorithm: BaseEstimator) -> Union[str, Any]:
         """
         Given a set of fully-qualified hyperparameters, create and test a
         algorithm model.
@@ -120,30 +124,28 @@ class Worker(object):
 
         try:
             LOGGER.debug('Choosing algorithm...')
-            # TODO select random algorithm
-            algorithm = ''
-            # TODO select random hyperparameters
-            params = {}
+            algorithm = random.choice(ALGORITHMS.keys())
+            params = algorithm.random_config()
 
         except Exception:
             LOGGER.error('Error choosing hyperparameters: datarun=%s' % str(self.dataset))
             LOGGER.error(traceback.format_exc())
             raise AlgorithmError()
 
-        param_info = 'Chose parameters for algorithm "%s":' % algorithm
+        param_info = 'Chose parameters for algorithm "%s":' % algorithm.class_path
         for k in sorted(params.keys()):
             param_info += '\n\t%s = %s' % (k, params[k])
         LOGGER.info(param_info)
 
-        LOGGER.debug('Creating classifier...')
-        classifier = self.db.start_classifier(datarun_id=self.dataset.id,
-                                              host=HOSTNAME,
-                                              algorithm=algorithm,
-                                              hyperparameter_values=params)
+        LOGGER.debug('Creating algorithm...')
+        algorithm = self.db.start_algorithm(datarun_id=self.dataset.id,
+                                            host=HOSTNAME,
+                                            algorithm=algorithm.class_path,
+                                            hyperparameter_values=params)
 
         try:
-            LOGGER.debug('Testing classifier...')
-            res = self.transform_dataset(algorithm, params)
+            LOGGER.debug('Testing algorithm...')
+            res = self.transform_dataset(algorithm.instance(params))
 
             LOGGER.debug('Saving algorithm...')
             self.save_algorithm(algorithm.id, res)

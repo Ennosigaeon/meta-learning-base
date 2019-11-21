@@ -1,0 +1,62 @@
+{
+  "name": "rf",
+  "class": "sklearn.ensemble.RandomForestClassifier",
+  "hyperparameters": {
+    "criterion": {
+      "type": "string",
+      "values": [
+        "entropy",
+        "gini"
+      ],
+      "default": "gini"
+    },
+    "max_features": {
+      "type": "float",
+      "range": [
+        0.1,
+        1.0
+      ],
+      "default": 0.5
+    },
+    "max_depth": {
+      "type": "int",
+      "range": [
+        2,
+        10
+      ]
+    },
+    "min_samples_split": {
+      "type": "int",
+      "range": [
+        2,
+        4
+      ],
+      "default": 2
+    },
+    "min_samples_leaf": {
+      "type": "int",
+      "range": [
+        1,
+        3
+      ],
+      "default": 1
+    },
+    "n_estimators": {
+      "type": "int",
+      "range": [
+        1,
+        100
+      ],
+      "default": 10
+    }
+  },
+  "root_hyperparameters": [
+    "criterion",
+    "max_features",
+    "max_depth",
+    "min_samples_leaf",
+    "min_samples_leaf",
+    "n_estimators"
+  ],
+  "conditional_hyperparameters": {}
+}
