@@ -143,53 +143,53 @@ def params_to_vectors(params, tunables):
 
 # Serializing and deserializing data on disk
 
-def make_save_path(dir, classifier, suffix):
+def make_save_path(dir, algorithm, suffix):
     """
-    Generate the base save path for a classifier's model and metrics files,
-    based on the classifier's dataset name and hyperparameters.
+    Generate the base save path for a algorithm's model and metrics files,
+    based on the algorithm's dataset name and hyperparameters.
     """
-    run_name = "".join([c for c in classifier.datarun.dataset.name
+    run_name = "".join([c for c in algorithm.datarun.dataset.name
                         if c.isalnum() or c in (' ', '-', '_')]).rstrip()
-    params_hash = hash_dict(classifier.hyperparameter_values)[:8]
+    params_hash = hash_dict(algorithm.hyperparameter_values)[:8]
     filename = "%s-%s.%s" % (run_name, params_hash, suffix)
     return os.path.join(dir, filename)
 
 
-def save_model(classifier, models_dir, model):
+def save_model(algorithm, models_dir, model):
     """
-    Save a serialized version of a Model object for a particular classifier.
-    The object will be stored at a path generated from the classifier's
+    Save a serialized version of a Model object for a particular algorithm.
+    The object will be stored at a path generated from the algorithm's
     attributes.
     """
-    path = make_save_path(models_dir, classifier, 'model')
+    path = make_save_path(models_dir, algorithm, 'model')
     logger.info('Saving model in: %s' % path)
     with open(path, 'wb') as f:
         pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
     return path
 
 
-def save_metrics(classifier, metrics_dir, metrics):
+def save_metrics(algorithm, metrics_dir, metrics):
     """
     Save a JSON-serialized version of a set of performance metrics for a
-    particular classifier. The metrics will be stored at a path generated from
-    the classifier's attributes.
+    particular algorithm. The metrics will be stored at a path generated from
+    the algorithm's attributes.
     """
-    path = make_save_path(metrics_dir, classifier, 'metric')
+    path = make_save_path(metrics_dir, algorithm, 'metric')
     logger.info('Saving metrics in: %s' % path)
     with open(path, 'w') as f:
         json.dump(metrics, f)
     return path
 
 
-def load_model(classifier, models_dir):
-    """ Load the Model object for a particular classifier """
-    path = make_save_path(models_dir, classifier, 'model')
+def load_model(algorithm, models_dir):
+    """ Load the Model object for a particular algorithm """
+    path = make_save_path(models_dir, algorithm, 'model')
     with open(path, 'rb') as f:
         return pickle.load(f)
 
 
-def load_metrics(classifier, metrics_dir):
-    """ Load the performance metrics for a particular classifier """
-    path = make_save_path(metrics_dir, classifier, 'metric')
+def load_metrics(algorithm, metrics_dir):
+    """ Load the performance metrics for a particular algorithm """
+    path = make_save_path(metrics_dir, algorithm, 'metric')
     with open(path) as f:
         return json.load(f)

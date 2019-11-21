@@ -2,14 +2,11 @@ from __future__ import absolute_import, unicode_literals
 
 import hashlib
 import json
-import os
-import pickle
 from builtins import object
 from datetime import datetime
 from typing import Optional, List, Dict
 
 import numpy as np
-import pandas as pd
 import pymysql
 from sklearn.model_selection import train_test_split
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, MetaData, Numeric, String, Text, create_engine
@@ -17,8 +14,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-from constants import (BUDGET_TYPES, CLASSIFIER_STATUS, DATARUN_STATUS, METRICS, SCORE_TARGETS, ClassifierStatus,
-                       RunStatus)
+from constants import ALGORITHM_STATUS, DATARUN_STATUS, METRICS, AlgorithmStatus, RunStatus
 from data import load_data
 from utilities import base_64_to_object, object_to_base_64
 
@@ -106,7 +102,7 @@ class Database(object):
         Base = declarative_base(metadata=metadata)
         db = self
 
-        # TODO adapt Datarun, Dataset and Classifier tables
+        # TODO adapt Datarun, Dataset and Algorithms tables
         class Dataset(Base):
             __tablename__ = 'datasets'
 
@@ -217,14 +213,11 @@ class Database(object):
             r_minimum = Column(Integer)
 
             # budget settings
-            budget_type = Column(Enum(*BUDGET_TYPES))
             budget = Column(Integer)
             deadline = Column(DateTime)
 
             # which metric to use for judgment, and how to compute it
             metric = Column(Enum(*METRICS))
-            score_target = Column(Enum(*[s + '_judgment_metric' for s in
-                                         SCORE_TARGETS]))
 
             # variables that store the status of the datarun
             start_time = Column(DateTime)
@@ -237,50 +230,11 @@ class Database(object):
                                self.budget_type, self.budget, self.status)
 
             @property
-            def completed_classifiers(self):
-                return len(self.get_complete_classifiers())
+            def completed_algorithm(self):
+                return len(self.get_complete_algorithms())
 
-            def get_scores(self):
-                columns = [
-                    'id',
-                    'cv_judgment_metric',
-                    'cv_judgment_metric_stdev',
-                    'test_judgment_metric',
-                ]
-
-                classifiers = db.get_classifiers(datarun_id=self.id)
-                scores = [
-                    {
-                        key: value
-                        for key, value in vars(classifier).items()
-                        if key in columns
-                    }
-                    for classifier in classifiers
-                ]
-
-                scores = pd.DataFrame(scores)
-                scores.sort_values(by='cv_judgment_metric', ascending=False, inplace=True)
-                scores['rank'] = scores['cv_judgment_metric'].rank(ascending=0)
-
-                return scores.reset_index(drop=True)
-
-            def get_complete_classifiers(self):
-                return db.get_classifiers(datarun_id=self.id, status=ClassifierStatus.COMPLETE)
-
-            def export_best_classifier(self, path, force=False):
-                if os.path.exists(path) and not force:
-                    print('The indicated path already exists. Use `force=True` to overwrite.')
-
-                base_path = os.path.dirname(path)
-                if base_path and not os.path.exists(base_path):
-                    os.makedirs(base_path)
-
-                classifier = self.get_best_classifier()
-                model = classifier.load_model()
-                with open(path, 'wb') as pickle_file:
-                    pickle.dump(model, pickle_file)
-
-                print("Classifier {} saved as {}".format(classifier.id, path))
+            def get_complete_algorithms(self):
+                return db.get_algorithms(datarun_id=self.id, status=AlgorithmStatus.COMPLETE)
 
             def describe(self):
                 dataset = db.get_dataset(self.dataset_id)
@@ -292,7 +246,7 @@ class Database(object):
                     "\tDataset: '{}'".format(dataset.train_path),
                     "\tColumn Name: '{}'".format(dataset.class_column),
                     "\tJudgment Metric: '{}'".format(self.metric),
-                    '\tClassifiers Tested: {}'.format(len(db.get_classifiers(datarun_id=self.id))),
+                    '\tAlgorithms Tested: {}'.format(len(db.get_algorithms(datarun_id=self.id))),
                     '\tElapsed Time: {}'.format(elapsed),
                 ]
 
@@ -301,8 +255,8 @@ class Database(object):
         Dataset.dataruns = relationship('Datarun', order_by='Datarun.id',
                                         back_populates='dataset')
 
-        class Classifier(Base):
-            __tablename__ = 'classifiers'
+        class Algorithms(Base):
+            __tablename__ = 'algorithms'
 
             # relational columns
             id = Column(Integer, primary_key=True, autoincrement=True)
@@ -329,7 +283,7 @@ class Database(object):
 
             start_time = Column(DateTime)
             end_time = Column(DateTime)
-            status = Column(Enum(*CLASSIFIER_STATUS), nullable=False)
+            status = Column(Enum(*ALGORITHM_STATUS), nullable=False)
             error_message = Column(Text)
 
             @property
@@ -358,8 +312,8 @@ class Database(object):
                 )
 
                 to_print = [
-                    'Classifier id: {}'.format(self.id),
-                    'Classifier type: {}'.format(
+                    'Algorithms id: {}'.format(self.id),
+                    'Algorithms type: {}'.format(
                         db.get_hyperpartition(self.hyperpartition_id).method),
                     'Params chosen: \n{}'.format(params),
                     'Cross Validation Score: {:.3f} +- {:.3f}'.format(
@@ -383,12 +337,12 @@ class Database(object):
                     with open(self.metrics_location, 'rb') as f:
                         return json.load(f)
 
-        Datarun.classifiers = relationship('Classifier',
-                                           order_by='Classifier.id',
+        Datarun.classifiers = relationship('Algorithms',
+                                           order_by='Algorithms.id',
                                            back_populates='datarun')
 
         self.Dataset = Dataset
-        self.Classifier = Classifier
+        self.Algorithm = Algorithms
 
         Base.metadata.create_all(bind=self.engine)
 
@@ -421,35 +375,35 @@ class Database(object):
         return datasets
 
     @try_with_session()
-    def get_classifiers(self, ignore_pending=False, ignore_running=False,
-                        ignore_complete=True) -> Optional[List['Database.Classifier']]:
+    def get_algorithms(self, ignore_pending=False, ignore_running=False,
+                       ignore_complete=True) -> Optional[List['Database.Algorithm']]:
         """
         Get a list of all datasets matching the chosen filters.
 
         Args:
-            ignore_pending: if True, ignore classifiers that have not been started
-            ignore_running: if True, ignore classifiers that are already running
-            ignore_complete: if True, ignore completed classifiers
+            ignore_pending: if True, ignore algorithms that have not been started
+            ignore_running: if True, ignore algorithms that are already running
+            ignore_complete: if True, ignore completed algorithms
         """
         # TODO adapt
-        query = self.session.query(self.Classifier)
+        query = self.session.query(self.Algorithm)
         if ignore_pending:
-            query = query.filter(self.Classifier.status != RunStatus.PENDING)
+            query = query.filter(self.Algorithm.status != RunStatus.PENDING)
         if ignore_running:
-            query = query.filter(self.Classifier.status != RunStatus.RUNNING)
+            query = query.filter(self.Algorithm.status != RunStatus.RUNNING)
         if ignore_complete:
-            query = query.filter(self.Classifier.status != RunStatus.COMPLETE)
+            query = query.filter(self.Algorithm.status != RunStatus.COMPLETE)
 
-        classifiers = query.all()
+        algorithms = query.all()
 
-        if not len(classifiers):
+        if not len(algorithms):
             return None
-        return classifiers
+        return algorithms
 
     @try_with_session()
-    def get_classifier(self, classifier_id):
-        """ Get a specific classifier. """
-        return self.session.query(self.Classifier).get(classifier_id)
+    def get_algorithm(self, algorithm_id):
+        """ Get a specific algorithm. """
+        return self.session.query(self.Algorithm).get(algorithm_id)
 
     # ##########################################################################
     # #  Methods to update the database  #######################################
@@ -462,51 +416,51 @@ class Database(object):
         return dataset
 
     @try_with_session(commit=True)
-    def start_classifier(self, dataset_id: int, host: str, algorithm: str,
-                         hyperparameter_values: Dict) -> 'Database.Classifier':
+    def start_algorithm(self, dataset_id: int, host: str, algorithm: str,
+                        hyperparameter_values: Dict) -> 'Database.Algorithm':
         """
-        Save a new, fully qualified classifier object to the database.
-        Returns: the ID of the newly-created classifier
+        Save a new, fully qualified algorithm object to the database.
+        Returns: the ID of the newly-created algorithm
         """
         # TODO adapt
-        classifier = self.Classifier(dataset_id=dataset_id,
-                                     host=host,
-                                     algorithm=algorithm,
-                                     hyperparameter_values=hyperparameter_values,
-                                     start_time=datetime.now(),
-                                     status=ClassifierStatus.RUNNING)
-        self.session.add(classifier)
-        return classifier
+        algorithm = self.Algorithm(dataset_id=dataset_id,
+                                   host=host,
+                                   algorithm=algorithm,
+                                   hyperparameter_values=hyperparameter_values,
+                                   start_time=datetime.now(),
+                                   status=AlgorithmStatus.RUNNING)
+        self.session.add(algorithm)
+        return algorithm
 
     @try_with_session(commit=True)
-    def complete_classifier(self, classifier_id, model_location,
-                            metrics_location, cv_score, cv_stdev, test_score):
+    def complete_algorithm(self, algorithm_id, model_location,
+                           metrics_location, cv_score, cv_stdev, test_score):
         """
-        Set all the parameters on a classifier that haven't yet been set, and mark
+        Set all the parameters on a algorithm that haven't yet been set, and mark
         it as complete.
         """
         # TODO adapt
-        classifier = self.session.query(self.Classifier).get(classifier_id)
+        algorithm = self.session.query(self.Algorithm).get(algorithm_id)
 
-        classifier.model_location = model_location
-        classifier.metrics_location = metrics_location
-        classifier.cv_judgment_metric = cv_score
-        classifier.cv_judgment_metric_stdev = cv_stdev
-        classifier.test_judgment_metric = test_score
-        classifier.end_time = datetime.now()
-        classifier.status = ClassifierStatus.COMPLETE
+        algorithm.model_location = model_location
+        algorithm.metrics_location = metrics_location
+        algorithm.cv_judgment_metric = cv_score
+        algorithm.cv_judgment_metric_stdev = cv_stdev
+        algorithm.test_judgment_metric = test_score
+        algorithm.end_time = datetime.now()
+        algorithm.status = AlgorithmStatus.COMPLETE
 
     @try_with_session(commit=True)
-    def mark_classifier_errored(self, classifier_id, error_message):
+    def mark_algorithm_errored(self, algorithm_id, error_message):
         """
-        Mark an existing classifier as having errored and set the error message. If
-        the classifier's hyperpartiton has produced too many erring classifiers, mark it
+        Mark an existing algorithm as having errored and set the error message. If
+        the algorithm's hyperpartiton has produced too many erring algorithms, mark it
         as errored as well.
         """
-        classifier = self.session.query(self.Classifier).get(classifier_id)
-        classifier.error_message = error_message
-        classifier.status = ClassifierStatus.ERRORED
-        classifier.end_time = datetime.now()
+        algorithm = self.session.query(self.Algorithm).get(algorithm_id)
+        algorithm.error_message = error_message
+        algorithm.status = AlgorithmStatus.ERRORED
+        algorithm.end_time = datetime.now()
 
     @try_with_session(commit=True)
     def mark_dataset_complete(self, dataset_id: int) -> None:

@@ -13,7 +13,7 @@ from database import Database
 from tqdm import tqdm
 
 from constants import RunStatus
-from worker import ClassifierError, Worker
+from worker import AlgorithmError, Worker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -96,13 +96,10 @@ class Core(object):
             aws_secret_key=self.aws_secret_key,
         )
 
-    def work(self, save_files=False, choose_randomly=True, wait=True, verbose=False):
+    def work(self, choose_randomly=True, wait=True, verbose=False):
         """Get unfinished Datasets from the database and work on them.
 
         Args:
-            save_files (bool):
-                Whether to save the fitted classifiers and their metrics or not.
-                Optional. Defaults to True.
             choose_randomly (bool):
                 If ``True``, work on all the highest-priority datasets in random order.
                 Otherwise, work on them in sequential order (by ID).
@@ -142,7 +139,7 @@ class Core(object):
 
             LOGGER.info('Computing on datarun %d' % ds.id)
             # actual work happens here
-            worker = Worker(self.db, ds, save_files=save_files, aws_access_key=self.aws_access_key,
+            worker = Worker(self.db, ds, aws_access_key=self.aws_access_key,
                             aws_secret_key=self.aws_secret_key, s3_bucket=self.s3_bucket,
                             s3_folder=self.s3_folder, models_dir=self.models_dir,
                             metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
@@ -151,18 +148,18 @@ class Core(object):
                 pbar = tqdm(
                     total=ds.budget,
                     ascii=True,
-                    initial=ds.completed_classifiers,
+                    initial=ds.completed_algorithm,
                     disable=not verbose
                 )
 
                 while ds.status != RunStatus.COMPLETE:
-                    worker.run_classifier()
+                    worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)
-                    if verbose and ds.completed_classifiers > pbar.last_print_n:
-                        pbar.update(ds.completed_classifiers - pbar.last_print_n)
+                    if verbose and ds.completed_algorithm > pbar.last_print_n:
+                        pbar.update(ds.completed_algorithm - pbar.last_print_n)
 
                 pbar.close()
-            except ClassifierError:
+            except AlgorithmError:
                 # the exception has already been handled; just wait a sec so we
                 # don't go out of control reporting errors
                 LOGGER.error('Something went wrong. Sleeping %d seconds.', self._LOOP_WAIT)

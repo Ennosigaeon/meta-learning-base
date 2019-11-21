@@ -162,7 +162,7 @@ class LogConfig(Config):
     verbose_metrics = {
         'help': (
             'If set, compute full ROC and PR curves and '
-            'per-label metrics for each classifier'
+            'per-label metrics for each algorithm'
         ),
         'action': 'store_true',
         'default': False
