@@ -26,10 +26,10 @@ class Core(object):
             self,
 
             # SQL Conf
-            dialect='sqlite',
-            database='ml-base.db',
-            username=None,
-            password=None,
+            dialect: str = 'sqlite',
+            database: str = 'ml-base.db',
+            username: str = None,
+            password: str = None,
             host=None,
             port=None,
             query=None,
@@ -45,8 +45,7 @@ class Core(object):
             metrics_dir: str = 'metrics',
             verbose_metrics: bool = False,
     ):
-
-        self.db = Database(dialect, database, username, host, port, query)
+        self.db = Database(dialect, database, username, password, host, port, query)
         self.s3_endpoint: str = endpoint
         self.s3_bucket: str = bucket
         self.s3_access_key: str = access_key

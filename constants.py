@@ -4,8 +4,7 @@ import logging
 from builtins import object
 
 # A bunch of constants which are used throughout the project, mostly for config.
-# TODO: convert these lists and classes to something more elegant, like enums
-SQL_DIALECTS = ['sqlite', 'mysql']
+SQL_DIALECTS = ['sqlite', 'mysql', 'postgres']
 DATARUN_STATUS = ['pending', 'running', 'complete']
 ALGORITHM_STATUS = ['running', 'errored', 'complete']
 

@@ -9,3 +9,4 @@ scikit-learn
 pymysql
 pandas
 numpy
+psycopg2
