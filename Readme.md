@@ -4,6 +4,11 @@
 
 This project requires Python 3.7, Docker and docker-compose
 
+Install requirements
+```bash
+pip3 install -r requirements.txt
+```
+
 Start docker containers
 ```bash
 docker-compose up
