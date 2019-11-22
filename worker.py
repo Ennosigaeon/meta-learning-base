@@ -28,10 +28,9 @@ class Worker(object):
                  database: Database,
                  dataset,
                  cloud_mode: bool = False,
-                 aws_access_key: str = None,
-                 aws_secret_key: str = None,
+                 s3_access_key: str = None,
+                 s3_secret_key: str = None,
                  s3_bucket: str = None,
-                 s3_folder: str = None,
                  models_dir: str = 'models',
                  metrics_dir: str = 'metrics',
                  verbose_metrics: bool = False):
@@ -40,10 +39,9 @@ class Worker(object):
         self.dataset = dataset
         self.cloud_mode = cloud_mode
 
-        self.aws_access_key = aws_access_key
-        self.aws_secret_key = aws_secret_key
+        self.s3_access_key = s3_access_key
+        self.s3_secret_key = s3_secret_key
         self.s3_bucket = s3_bucket
-        self.s3_folder = s3_folder
 
         self.models_dir = models_dir
         self.metrics_dir = metrics_dir

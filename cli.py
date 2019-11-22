@@ -5,19 +5,19 @@ import logging
 
 from core import Core
 
-from config import AWSConfig, DatasetConfig, LogConfig, SQLConfig
+from config import S3Config, DatasetConfig, LogConfig, SQLConfig
 
 LOGGER = logging.getLogger(__name__)
 
 
 def _get_core(args) -> Core:
     sql_conf = SQLConfig(args)
-    aws_conf = AWSConfig(args)
+    s3_conf = S3Config(args)
     log_conf = LogConfig(args)
 
     # Build params dictionary to pass to Core.
     core_args = sql_conf.to_dict()
-    core_args.update(aws_conf.to_dict())
+    core_args.update(s3_conf.to_dict())
     core_args.update(log_conf.to_dict())
 
     return Core(**core_args)
@@ -55,7 +55,7 @@ def _get_parser():
 
     # Common Arguments
     sql_args = SQLConfig.get_parser()
-    aws_args = AWSConfig.get_parser()
+    aws_args = S3Config.get_parser()
     log_args = LogConfig.get_parser()
     dataset_args = DatasetConfig.get_parser()
 

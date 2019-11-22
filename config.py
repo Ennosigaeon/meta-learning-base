@@ -115,14 +115,14 @@ class Config(object):
         return '{}({})'.format(self.__class__.__name__, self.to_dict())
 
 
-class AWSConfig(Config):
+class S3Config(Config):
     """ Stores configuration for AWS S3 connections """
-    _PREFIX = 'aws'
+    _PREFIX = 's3'
 
-    access_key = 'AWS access key'
-    secret_key = 'AWS secret key'
-    s3_bucket = 'AWS S3 bucket to store data'
-    s3_folder = 'Folder in AWS S3 bucket in which to store data'
+    endpoint = 'S3 endpoint'
+    access_key = 'S3 access key'
+    secret_key = 'S3 secret key'
+    bucket = 'S3 bucket to store data'
 
 
 class DatasetConfig(Config):

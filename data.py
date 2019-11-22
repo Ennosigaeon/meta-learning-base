@@ -3,104 +3,81 @@ import os
 
 import boto3
 import pandas as pd
-import requests
+from botocore.client import BaseClient
 from botocore.exceptions import ClientError
+from typing import Tuple
 
 LOGGER = logging.getLogger('mlb')
 
 
-def _download_from_s3(path: str, local_path: str, aws_access_key: str = None, aws_secret_key: str = None,
-                      **kwargs) -> str:
-    client = boto3.client(
-        's3',
-        aws_access_key_id=aws_access_key,
-        aws_secret_access_key=aws_secret_key,
-    )
-
-    bucket = path.split('/')[2]
-    file_to_download = path.replace('s3://{}/'.format(bucket), '')
-
-    try:
-        LOGGER.info('Downloading {}'.format(path))
-        client.download_file(bucket, file_to_download, local_path)
-
-        return local_path
-
-    except ClientError as e:
-        LOGGER.error('An error occurred trying to download from AWS3.'
-                     'The following error has been returned: {}'.format(e))
-
-
-def _download_from_url(url: str, local_path: str, **kwargs) -> str:
-    data = requests.get(url).text
-    with open(local_path, 'wb') as outfile:
-        outfile.write(data.encode())
-
-    LOGGER.info('File saved at {}'.format(local_path))
-
-    return local_path
-
-
-DOWNLOADERS = {
-    's3': _download_from_s3,
-    'http': _download_from_url,
-    'https': _download_from_url,
-}
-
-
-def _download(path: str, local_path: str, **kwargs) -> str:
-    protocol = path.split(':', 1)[0]
-    downloader = DOWNLOADERS.get(protocol)
-
-    if not downloader:
-        raise ValueError('Unknown protocol: {}'.format(protocol))
-
-    return downloader(path, local_path, **kwargs)
-
-
-def _get_local_path(name: str, path: str, aws_access_key: str = None, aws_secret_key: str = None) -> str:
-    if os.path.isfile(path):
-        return path
+def _get_local_path(path: str, name: str = None) -> str:
+    if name is None:
+        name = path.split('/')[-1]
+    if not name.endswith('csv'):
+        name = name + '.csv'
 
     cwd = os.getcwd()
     data_path = os.path.join(cwd, 'data')
 
-    if not name.endswith('csv'):
-        name = name + '.csv'
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
 
-    local_path = os.path.join(data_path, name)
-
-    if os.path.isfile(local_path):
-        return local_path
-
-    if not os.path.isfile(local_path):
-        if not os.path.exists(data_path):
-            os.makedirs(data_path)
-
-        _download(path, local_path, aws_access_key=aws_access_key, aws_secret_key=aws_secret_key)
-        return local_path
+    return os.path.join(data_path, name)
 
 
-def load_data(name: str, path: str, aws_access_key: str = None, aws_secret_key: str = None) -> pd.DataFrame:
-    """Load data from the given path.
+def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
+              s3_secret_key: str = None, name: str = None) -> pd.DataFrame:
+    def _download_file() -> str:
+        if os.path.isfile(path):
+            return path
 
-    If the path is an URL or an S3 path, download it and make a local copy
-    of it to avoid having to dowload it later again.
+        local_path = _get_local_path(path, name)
+        if os.path.isfile(local_path):
+            return local_path
 
-    Args:
-        name (str):
-            Name of the dataset. Used to cache the data locally.
-        path (str):
-            Local path or S3 path or URL.
-        aws_access_key (str):
-            AWS access key. Optional.
-        aws_secret_key (str):
-            AWS secret key. Optional.
+        client = boto3.client(
+            's3',
+            endpoint_url=s3_endpoint,
+            aws_access_key_id=s3_access_key,
+            aws_secret_access_key=s3_secret_key,
+        )
 
-    Returns:
-        pandas.DataFrame:
-            The loaded data.
-    """
-    local_path = _get_local_path(name, path, aws_access_key=aws_access_key, aws_secret_key=aws_secret_key)
+        bucket = path.split('/')[2]
+        file_to_download = path.replace('s3://{}/'.format(bucket), '')
 
-    return pd.read_csv(local_path)
+        try:
+            LOGGER.info('Downloading {}'.format(path))
+            client.download_file(bucket, file_to_download, local_path)
+
+            return local_path
+
+        except ClientError as e:
+            LOGGER.error('An error occurred trying to download from AWS3.'
+                         'The following error has been returned: {}'.format(e))
+
+    path = _download_file()
+    return pd.read_csv(path)
+
+
+def store_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,
+               name: str = None) -> Tuple[str, str]:
+    client: BaseClient = boto3.client(
+        's3',
+        endpoint_url=s3_endpoint,
+        aws_access_key_id=s3_access_key,
+        aws_secret_access_key=s3_secret_key,
+    )
+
+    name = input_file.split('/')[-1]
+    try:
+        LOGGER.info('Uploading {}'.format(input_file))
+        client.upload_file(input_file, s3_bucket, name)
+
+        remote_path = "{0}/{1}/{2}".format(s3_endpoint, s3_bucket, name)
+        local_path = _get_local_path(input_file, name)
+
+        # TODO move file from local_file to local_path
+        return local_path, remote_path
+    except ClientError as e:
+        LOGGER.error('An error occurred trying to upload to AWS3.'
+                     'The following error has been returned: {}'.format(e))

@@ -9,6 +9,7 @@ import random
 import time
 from operator import attrgetter
 
+from data import store_data
 from database import Database
 from tqdm import tqdm
 
@@ -33,23 +34,23 @@ class Core(object):
             port=None,
             query=None,
 
-            # AWS Conf
-            access_key=None,
-            secret_key=None,
-            s3_bucket=None,
-            s3_folder=None,
+            # S3 Conf
+            endpoint: str = None,
+            bucket: str = None,
+            access_key: str = None,
+            secret_key: str = None,
 
             # Log Conf
-            models_dir='models',
-            metrics_dir='metrics',
-            verbose_metrics=False,
+            models_dir: str = 'models',
+            metrics_dir: str = 'metrics',
+            verbose_metrics: bool = False,
     ):
 
         self.db = Database(dialect, database, username, host, port, query)
-        self.aws_access_key: str = access_key
-        self.aws_secret_key: str = secret_key
-        self.s3_bucket: str = s3_bucket
-        self.s3_folder: str = s3_folder
+        self.s3_endpoint: str = endpoint
+        self.s3_bucket: str = bucket
+        self.s3_access_key: str = access_key
+        self.s3_secret_key: str = secret_key
 
         self.models_dir: str = models_dir
         self.metrics_dir: str = metrics_dir
@@ -85,6 +86,7 @@ class Core(object):
         """
 
         # TODO calculate meta features
+        store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
         return self.db.create_dataset(
             train_path=train_path,
@@ -92,8 +94,8 @@ class Core(object):
             name=name,
             description=description,
             class_column=class_column,
-            aws_access_key=self.aws_access_key,
-            aws_secret_key=self.aws_secret_key,
+            aws_access_key=self.s3_access_key,
+            aws_secret_key=self.s3_secret_key,
         )
 
     def work(self, choose_randomly=True, wait=True, verbose=False):
@@ -139,9 +141,8 @@ class Core(object):
 
             LOGGER.info('Computing on datarun %d' % ds.id)
             # actual work happens here
-            worker = Worker(self.db, ds, aws_access_key=self.aws_access_key,
-                            aws_secret_key=self.aws_secret_key, s3_bucket=self.s3_bucket,
-                            s3_folder=self.s3_folder, models_dir=self.models_dir,
+            worker = Worker(self.db, ds, s3_access_key=self.s3_access_key,
+                            s3_secret_key=self.s3_secret_key, s3_bucket=self.s3_bucket, models_dir=self.models_dir,
                             metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
 
             try:
