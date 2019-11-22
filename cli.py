@@ -55,7 +55,7 @@ def _get_parser():
 
     # Common Arguments
     sql_args = SQLConfig.get_parser()
-    aws_args = S3Config.get_parser()
+    s3_args = S3Config.get_parser()
     log_args = LogConfig.get_parser()
     dataset_args = DatasetConfig.get_parser()
 
@@ -63,7 +63,7 @@ def _get_parser():
     enter_data_parents = [
         logging_args,
         sql_args,
-        aws_args,
+        s3_args,
         dataset_args,
         log_args
     ]
@@ -83,7 +83,7 @@ def _get_parser():
         logging_args,
         worker_args,
         sql_args,
-        aws_args,
+        s3_args,
         log_args
     ]
     worker = subparsers.add_parser('worker', parents=worker_parents,

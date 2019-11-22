@@ -9,6 +9,8 @@ from typing import Tuple
 
 LOGGER = logging.getLogger('mlb')
 
+WORK_DIR = 'data'
+
 
 def _get_local_path(path: str, name: str = None) -> str:
     if name is None:
@@ -17,7 +19,7 @@ def _get_local_path(path: str, name: str = None) -> str:
         name = name + '.csv'
 
     cwd = os.getcwd()
-    data_path = os.path.join(cwd, 'data')
+    data_path = os.path.join(cwd, WORK_DIR)
 
     if not os.path.exists(data_path):
         os.makedirs(data_path)
@@ -27,35 +29,31 @@ def _get_local_path(path: str, name: str = None) -> str:
 
 def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
               s3_secret_key: str = None, name: str = None) -> pd.DataFrame:
-    def _download_file() -> str:
-        if os.path.isfile(path):
-            return path
-
+    if not os.path.isfile(path):
         local_path = _get_local_path(path, name)
         if os.path.isfile(local_path):
-            return local_path
+            path = local_path
+        elif s3_access_key is None:
+            raise FileNotFoundError(f'{path} does not exist')
+        else:
+            client = boto3.client(
+                's3',
+                endpoint_url=s3_endpoint,
+                aws_access_key_id=s3_access_key,
+                aws_secret_access_key=s3_secret_key,
+            )
 
-        client = boto3.client(
-            's3',
-            endpoint_url=s3_endpoint,
-            aws_access_key_id=s3_access_key,
-            aws_secret_access_key=s3_secret_key,
-        )
+            bucket = path.split('/')[2]
+            file_to_download = path.replace('s3://{}/'.format(bucket), '')
 
-        bucket = path.split('/')[2]
-        file_to_download = path.replace('s3://{}/'.format(bucket), '')
+            try:
+                LOGGER.info('Downloading {}'.format(path))
+                client.download_file(bucket, file_to_download, local_path)
+                path = local_path
+            except ClientError as e:
+                LOGGER.error('An error occurred trying to download from AWS3.'
+                             'The following error has been returned: {}'.format(e))
 
-        try:
-            LOGGER.info('Downloading {}'.format(path))
-            client.download_file(bucket, file_to_download, local_path)
-
-            return local_path
-
-        except ClientError as e:
-            LOGGER.error('An error occurred trying to download from AWS3.'
-                         'The following error has been returned: {}'.format(e))
-
-    path = _download_file()
     return pd.read_csv(path)
 
 
@@ -68,7 +66,8 @@ def store_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key:
         aws_secret_access_key=s3_secret_key,
     )
 
-    name = input_file.split('/')[-1]
+    if name is None:
+        name = input_file.split('/')[-1]
     try:
         LOGGER.info('Uploading {}'.format(input_file))
         client.upload_file(input_file, s3_bucket, name)
