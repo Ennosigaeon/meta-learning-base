@@ -1,0 +1,24 @@
+version: "3.3"
+services:
+  postgres:
+    image: postgres:11.6
+    hostname: postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - /mnt/data/postgres:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+  minio:
+    image: minio/minio:RELEASE.2019-10-12T01-39-57Z
+    hostname: minio
+    command: server /data
+    environment:
+      MINIO_ACCESS_KEY: access_key
+      MINIO_SECRET_KEY: secret_key
+    volumes:
+      - /mnt/data/minio:/data
+    ports:
+      - 9090:9000

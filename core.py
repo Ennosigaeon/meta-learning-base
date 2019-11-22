@@ -27,7 +27,7 @@ class Core(object):
 
             # SQL Conf
             dialect: str = 'sqlite',
-            database: str = 'ml-base.db',
+            database: str = 'assets/ml-base.db',
             username: str = None,
             password: str = None,
             host=None,
