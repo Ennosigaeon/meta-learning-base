@@ -55,8 +55,7 @@ class Core(object):
         self.metrics_dir: str = metrics_dir
         self.verbose_metrics: bool = verbose_metrics
 
-    def add_dataset(self, train_path, test_path=None, name=None,
-                    description=None, class_column=None):
+    def add_dataset(self, train_path, test_path=None, reference_path=None, name=None):
         """Add a new dataset to the Database.
 
         Args:
@@ -70,14 +69,16 @@ class Core(object):
                 format ``s3://{bucket_name}/{key}``.
                 Optional. If not given, the training CSV will be split in two parts,
                 train and test.
+            reference_path (str):
+                Path to the referring dataset CSV file. It can be a local filesystem path,
+                absolute or relative, or an HTTP or HTTPS URL, or an S3 path in the
+                format ``s3://{bucket_name}/{key}``.
+                Optional.
             name (str):
                 Name given to this dataset. Optional. If not given, a hash will be
                 generated from the training_path and used as the Dataset name.
-            description (str):
-                Human friendly description of the Dataset. Optional.
-            class_column (str):
-                Name of the column that will be used as the target variable.
-                Optional. Defaults to ``'class'``.
+
+
 
         Returns:
             Dataset:
@@ -85,14 +86,13 @@ class Core(object):
         """
 
         # TODO calculate meta features
-        store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
+        # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
         return self.db.create_dataset(
             train_path=train_path,
             test_path=test_path,
+            reference_path=reference_path,
             name=name,
-            description=description,
-            class_column=class_column,
             aws_access_key=self.s3_access_key,
             aws_secret_key=self.s3_secret_key,
         )

@@ -14,7 +14,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-from constants import ALGORITHM_STATUS, DATARUN_STATUS, METRICS, AlgorithmStatus, RunStatus
+from constants import ALGORITHM_STATUS, AlgorithmStatus, RunStatus
 from data import load_data
 from utilities import base_64_to_object, object_to_base_64
 
@@ -96,13 +96,13 @@ class Database(object):
         the database metadata is available (at runtime).
         If the database does not already exist, it will be created. If it does
         exist, it will not be updated with new schema -- after schema changes,
-        the database must be destroyed and reinialized.
+        the database must be destroyed and reinitialized.
         """
         metadata = MetaData(bind=self.engine)
         Base = declarative_base(metadata=metadata)
         db = self
 
-        # TODO adapt Datarun, Dataset and Algorithms tables
+        # TODO adapt Datarun, Dataset and Algorithm tables
         class Dataset(Base):
             __tablename__ = 'datasets'
 
@@ -110,17 +110,78 @@ class Database(object):
             name = Column(String(100), nullable=False)
 
             # columns necessary for loading/processing data
-            class_column = Column(String(100), nullable=False)
-            train_path = Column(String(200), nullable=False)
-            test_path = Column(String(200))
-            description = Column(String(1000))
+            train_path = Column(String, nullable=False)
+            test_path = Column(String)
+            reference_path = Column(String)
+            processed = Column(Integer)
 
-            # metadata columns, for convenience
-            n_examples = Column(Integer, nullable=False)
-            k_classes = Column(Integer, nullable=False)
-            d_features = Column(Integer, nullable=False)
-            majority = Column(Numeric(precision=10, scale=9), nullable=False)
-            size_kb = Column(Integer, nullable=False)
+            # metadata columns
+            # Type: Continuous
+            numberOfNumericAttributes = Column(Integer)
+            # percentageOfNumericAttributes = Column(Integer)
+            # minMeansOfNumericAttributes = Column(Integer)
+            # minStdDevOfNumericAttributes = Column(Integer)
+            # minKurtosisOfNumericAttributes = Column(Integer)
+            # minSkewnessOfNumericalAttributes = Column(Integer)
+            # meanMeansOfNumericAttributes = Column(Integer)
+            # meanStdDevOfNumericAttributes = Column(Integer)
+            # meanKurtosisOfNumericAttributes = Column(Integer)
+            # meanSkewnessOfNumericalAttributes = Column(Integer)
+            # maxMeansOfNumericAttributes = Column(Integer)
+            # maxStdDevOfNumericAttributes = Column(Integer)
+            # maxKurtosisOfNumericAttributes = Column(Integer)
+            # maxSkewnessOfNumericalAttributes = Column(Integer)
+            # quartile1MeansOfNumericAttributes = Column(Integer)
+            # quartile1StdDevOfNumericAttributes = Column(Integer)
+            # quartile1KurtosisOfNumericAttributes = Column(Integer)
+            # quartile1SkewnessOfNumericalAttributes = Column(Integer)
+            # quartile2MeansOfNumericAttributes = Column(Integer)
+            # quartile2StdDevOfNumericAttributes = Column(Integer)
+            # quartile2KurtosisOfNumericAttributes = Column(Integer)
+            # quartile2SkewnessOfNumericalAttributes = Column(Integer)
+            # quartile3MeansOfNumericAttributes = Column(Integer)
+            # quartile3StdDevOfNumericAttributes = Column(Integer)
+            # quartile3KurtosisOfNumericAttributes = Column(Integer)
+            # quartile3SkewnessOfNumericalAttributes = Column(Integer)
+
+            # Type: Categorical
+            numberOfCategoricalAttributes = Column(Integer)
+            numberOfBinaryAttributes = Column(Integer)
+            # percentageOfCategoricalAttributes = Column(Integer)
+            # percentageOfBinaryAttributes = Column(Integer)
+            # minAttributeEntropy = Column(Integer)
+            # meanAttributeEntropy = Column(Integer)
+            # maxAttributeEntropy = Column(Integer)
+            # quartile1AttributeEntropy = Column(Integer)
+            # quartile2AttributeEntropy = Column(Integer)
+            # quartile3AttributeEntropy = Column(Integer)
+            # minMutualInformation = Column(Integer)
+            # meanMutualInformation = Column(Integer)
+            # maxMutualInformation = Column(Integer)
+            # quartile1MutualInformation = Column(Integer)
+            # quartile2MutualInformation = Column(Integer)
+            # quartile3MutualInformation = Column(Integer)
+            # equivalentNumberOfAttributes = Column(Integer)
+            # meanNoiseToSignalRatio = Column(Integer)
+            # minAttributeDistinctValues = Column(Integer)
+            # meanAttributeDistinctValues = Column(Integer)
+            # maxAttributeDistinctValues = Column(Integer)
+            # stdAttributeDistinctValues = Column(Integer)
+
+            # Type: Generic
+            numberOfInstances = Column(Integer)
+            numberOfAttributes = Column(Integer)
+            dimensionality = Column(Integer)
+            numberOfMissingValues = Column(Integer)
+            percentageOfMissingValues = Column(Integer)
+            numberOfInstancesWithMissingValues = Column(Integer)
+            percentageOfInstancesWithMissingValues = Column(Integer)
+            numberOfClasses = Column(Integer)
+            classEntropy = Column(Integer)
+            # minorityClassSize = Column(Integer)
+            # majorityClassSize = Column(Integer)
+            # minorityClassPercentage = Column(Integer)
+            # majorityClassPercentage = Column(Integer)
 
             def load(self, test_size=0.3, random_state=0,
                      aws_access_key=None, aws_secret_key=None):
@@ -139,140 +200,44 @@ class Database(object):
                 else:
                     return train_test_split(data, test_size=test_size, random_state=random_state)
 
-            def _add_extra_fields(self, aws_access_key=None, aws_secret_key=None):
-
-                data = load_data(self.name, self.train_path, aws_access_key, aws_secret_key)
-
-                if self.n_examples is None:
-                    self.n_examples = len(data)
-
-                if self.k_classes is None:
-                    self.k_classes = len(np.unique(data[self.class_column]))
-
-                if self.d_features is None:
-                    total_features = data.shape[1] - 1
-                    for column in data.columns:
-                        if data[column].dtype == 'object':
-                            total_features += len(np.unique(data[column])) - 1
-
-                    self.d_features = total_features
-
-                if self.majority is None:
-                    counts = data[self.class_column].value_counts()
-                    self.majority = float(max(counts)) / float(sum(counts))
-
-                if self.size_kb is None:
-                    self.size_kb = int(np.array(data).nbytes / 1000)
-
             @staticmethod
             def _make_name(path):
                 md5 = hashlib.md5(path.encode('utf-8'))
                 return md5.hexdigest()
 
-            def __init__(self, train_path, test_path=None, name=None, description=None,
-                         class_column=None, n_examples=None, majority=None, k_classes=None,
-                         size_kb=None, d_features=None, id=None, aws_access_key=None,
+            def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None, aws_access_key=None,
                          aws_secret_key=None):
 
                 self.train_path = train_path
                 self.test_path = test_path
+                self.reference_path = reference_path
                 self.name = name or self._make_name(train_path)
-                self.description = description or self.name
-                self.class_column = class_column
+                self.status = status
+
                 self.id = id
-
-                self.n_examples = n_examples
-                self.d_features = d_features
-                self.majority = majority
-                self.k_classes = k_classes
-                self.size_kb = size_kb
-
-                self._add_extra_fields(aws_access_key, aws_secret_key)
 
             def __repr__(self):
                 base = "<%s: %s, %d classes, %d features, %d rows>"
-                return base % (self.name, self.description, self.k_classes,
-                               self.d_features, self.n_examples)
+                return base % (self.name, self.numberOfClasses, self.numberOfAttributes, self.numberOfInstances)
 
-        class Datarun(Base):
-            __tablename__ = 'dataruns'
-
-            # relational columns
-            id = Column(Integer, primary_key=True, autoincrement=True)
-            dataset_id = Column(Integer, ForeignKey('datasets.id'))
-            dataset = relationship('Dataset', back_populates='dataruns')
-
-            description = Column(String(200), nullable=False)
-            priority = Column(Integer)
-
-            # hyperparameter selection and tuning settings
-            selector = Column(String(200), nullable=False)
-            k_window = Column(Integer)
-            tuner = Column(String(200), nullable=False)
-            gridding = Column(Integer, nullable=False)
-            r_minimum = Column(Integer)
-
-            # budget settings
-            budget = Column(Integer)
-            deadline = Column(DateTime)
-
-            # which metric to use for judgment, and how to compute it
-            metric = Column(Enum(*METRICS))
-
-            # variables that store the status of the datarun
-            start_time = Column(DateTime)
-            end_time = Column(DateTime)
-            status = Column(Enum(*DATARUN_STATUS), default=RunStatus.PENDING)
-
-            def __repr__(self):
-                base = "<ID = %d, dataset ID = %s, strategy = %s, budget = %s (%s), status: %s>"
-                return base % (self.id, self.dataset_id, self.description,
-                               self.budget_type, self.budget, self.status)
-
-            @property
-            def completed_algorithm(self):
-                return len(self.get_complete_algorithms())
-
-            def get_complete_algorithms(self):
-                return db.get_algorithms(datarun_id=self.id, status=AlgorithmStatus.COMPLETE)
-
-            def describe(self):
-                dataset = db.get_dataset(self.dataset_id)
-
-                elapsed = self.end_time - self.start_time if self.end_time else 'Not finished yet.'
-
-                to_print = [
-                    'Datarun {} summary:'.format(self.id),
-                    "\tDataset: '{}'".format(dataset.train_path),
-                    "\tColumn Name: '{}'".format(dataset.class_column),
-                    "\tJudgment Metric: '{}'".format(self.metric),
-                    '\tAlgorithms Tested: {}'.format(len(db.get_algorithms(datarun_id=self.id))),
-                    '\tElapsed Time: {}'.format(elapsed),
-                ]
-
-                print('\n'.join(to_print))
-
-        Dataset.dataruns = relationship('Datarun', order_by='Datarun.id',
-                                        back_populates='dataset')
-
-        class Algorithms(Base):
+        class Algorithm(Base):
             __tablename__ = 'algorithms'
 
             # relational columns
             id = Column(Integer, primary_key=True, autoincrement=True)
-            datarun_id = Column(Integer, ForeignKey('dataruns.id'))
-            datarun = relationship('Datarun', back_populates='classifiers')
-            hyperpartition_id = Column(Integer, ForeignKey('hyperpartitions.id'))
-            hyperpartition = relationship('Hyperpartition',
-                                          back_populates='classifiers')
+            inputdataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
 
-            # name of the host where the model was trained
-            host = Column(String(50))
+            #
+            name = Column(String(100))
+            algorithm = Column(String(300))
 
-            # these columns point to where the output is stored
-            model_location = Column(String(300))
-            metrics_location = Column(String(300))
-
+            # hyperparameter
+            accuracy = Column(Integer)
+            average_precision = Column(Integer)
+            f1_score = Column(Integer)
+            precision = Column(Integer)
+            recall = Column(Integer)
+            neg_log_loss = Column(Integer)
             # base 64 encoding of the hyperparameter names and values
             hyperparameter_values_64 = Column(Text, nullable=False)
 
@@ -300,7 +265,7 @@ class Database(object):
                 # judgment metric
                 if self.cv_judgment_metric is None:
                     return None
-                return (self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev)
+                return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
 
             def __repr__(self):
 
@@ -312,8 +277,8 @@ class Database(object):
                 )
 
                 to_print = [
-                    'Algorithms id: {}'.format(self.id),
-                    'Algorithms type: {}'.format(
+                    'Algorithm id: {}'.format(self.id),
+                    'Algorithm type: {}'.format(
                         db.get_hyperpartition(self.hyperpartition_id).method),
                     'Params chosen: \n{}'.format(params),
                     'Cross Validation Score: {:.3f} +- {:.3f}'.format(
@@ -323,26 +288,10 @@ class Database(object):
 
                 return '\n'.join(to_print)
 
-            def load_metrics(self):
-                """Return the metrics"""
-                if self.metrics_location.startswith('s3'):
-                    pickled = self.load_s3_data(
-                        self.metrics_location,
-                        self.aws_access_key,
-                        self.aws_secret_key,
-                    )
-                    return json.load(pickled)
-
-                else:
-                    with open(self.metrics_location, 'rb') as f:
-                        return json.load(f)
-
-        Datarun.classifiers = relationship('Algorithms',
-                                           order_by='Algorithms.id',
-                                           back_populates='datarun')
+        Dataset.algorithms = relationship('Algorithm', order_by=Algorithm.id)
 
         self.Dataset = Dataset
-        self.Algorithm = Algorithms
+        self.Algorithm = Algorithm
 
         Base.metadata.create_all(bind=self.engine)
 
@@ -361,13 +310,6 @@ class Database(object):
         # TODO adapt
 
         query = self.session.query(self.Dataset)
-        if ignore_pending:
-            query = query.filter(self.Dataset.status != RunStatus.PENDING)
-        if ignore_running:
-            query = query.filter(self.Dataset.status != RunStatus.RUNNING)
-        if ignore_complete:
-            query = query.filter(self.Dataset.status != RunStatus.COMPLETE)
-
         datasets = query.all()
 
         if not len(datasets):

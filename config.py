@@ -135,8 +135,8 @@ class DatasetConfig(Config):
         'required': True
     }
     test_path = 'Path to raw test data (if applicable)'
-    description = 'Description of dataset'
-    class_column = ('Name of the class column in the input data', 'class')
+
+
 
 
 class SQLConfig(Config):
