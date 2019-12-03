@@ -4,12 +4,12 @@ import socket
 import traceback
 import warnings
 from builtins import object, str
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 from sklearn.base import BaseEstimator
 
-from algorithm import ALGORITHMS
 from database import Database
+from methods import ALGORITHMS
 from utilities import ensure_directory
 
 warnings.filterwarnings('ignore')
@@ -71,7 +71,7 @@ class Worker(object):
 
         return ''
 
-    def save_algorithm(self, algorithm_id: int, res: Union[str, Any]) -> None:
+    def save_algorithm(self, algorithm_id: Optional[int], res: Union[str, Any]) -> None:
         """
         Update a algorithm with metrics and model information and mark it as
         "complete"
@@ -122,7 +122,7 @@ class Worker(object):
 
         try:
             LOGGER.debug('Choosing algorithm...')
-            algorithm = random.choice(ALGORITHMS.keys())
+            algorithm = random.choice(ALGORITHMS)
             params = algorithm.random_config()
 
         except Exception:
@@ -136,7 +136,7 @@ class Worker(object):
         LOGGER.info(param_info)
 
         LOGGER.debug('Creating algorithm...')
-        algorithm = self.db.start_algorithm(datarun_id=self.dataset.id,
+        algorithm = self.db.start_algorithm(dataset_id=self.dataset.id,
                                             host=HOSTNAME,
                                             algorithm=algorithm.class_path,
                                             hyperparameter_values=params)

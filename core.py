@@ -94,11 +94,10 @@ class Core(object):
             name=name
         )
 
-    def add_algorithm(self, ds_id, algorithm, name=None):
+    def add_algorithm(self, ds_id: int, algorithm: str):
         return self.db.start_algorithm(
             dataset_id=ds_id,
-            algorithm=algorithm,
-            name=name
+            algorithm=algorithm
         )
 
     def work(self, choose_randomly=True, wait=True, verbose=False):

@@ -1,12 +1,20 @@
 from __future__ import absolute_import, unicode_literals
 
 import hashlib
+import importlib
+import json
+import os
 from builtins import object
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 import numpy as np
 import pymysql
+from ConfigSpace.conditions import InCondition
+from ConfigSpace.configuration_space import ConfigurationSpace
+from ConfigSpace.hyperparameters import UniformIntegerHyperparameter, UniformFloatHyperparameter, \
+    CategoricalHyperparameter
+from sklearn.base import BaseEstimator
 from sklearn.model_selection import train_test_split
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, create_engine
 from sqlalchemy.engine.url import URL
@@ -148,7 +156,6 @@ class Algorithm(Base):
     dataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
 
     #
-    name = Column(String(100))
     algorithm = Column(String(300), nullable=False)
 
     # hyperparameter
@@ -188,22 +195,87 @@ class Algorithm(Base):
         return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
 
     def __init__(self,
-                 algorithm,
-                 dataset_id,
-                 name=None,
-                 id=None,
+                 algorithm: str,
+                 dataset_id: int,
+                 id: int = None,
                  status=None,
-                 start_time=None,
-                 end_time=None,
-                 error_message=None):
-        self.algorithm = algorithm
-        self.name = name
+                 start_time: datetime = None,
+                 end_time: datetime = None,
+                 error_message: str = None):
+        self.algorithm: str = algorithm
         self.status = status
-        self.id = id
-        self.dataset_id = dataset_id
-        self.start_time = start_time
-        self.end_time = end_time
-        self.error_message = error_message
+        self.id: Optional[int] = id
+        self.dataset_id: int = dataset_id
+        self.start_time: Optional[datetime] = start_time
+        self.end_time: Optional[datetime] = end_time
+        self.error_message: Optional[str] = error_message
+
+    def _load_cs(self):
+        """
+        method: method code or path to JSON file containing all the information
+            needed to specify this enumerator.
+        """
+        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm)
+        with open(config_path) as f:
+            config = json.load(f)
+
+        self.root_params = config['root_hyperparameters']
+        self.conditions = config['conditional_hyperparameters']
+        self.class_path = config['class']
+
+        # create hyperparameters from the parameter config
+        cs = ConfigurationSpace()
+
+        self.parameters = {}
+        for k, v in list(config['hyperparameters'].items()):
+            param_type = v['type']
+            if param_type == 'int':
+                self.parameters[k] = UniformIntegerHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
+                                                                  default_value=v.get('default', None))
+            elif param_type == 'int_exp':
+                self.parameters[k] = UniformIntegerHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
+                                                                  default_value=v.get('default', None), log=True)
+            elif param_type == 'float':
+                self.parameters[k] = UniformFloatHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
+                                                                default_value=v.get('default', None))
+            elif param_type == 'float_exp':
+                self.parameters[k] = UniformFloatHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
+                                                                default_value=v.get('default', None), log=True)
+            elif param_type == 'string':
+                # noinspection PyArgumentList
+                self.parameters[k] = CategoricalHyperparameter(k, choices=v['values'],
+                                                               default_value=v.get('default', None))
+            elif param_type == 'bool':
+                # noinspection PyArgumentList
+                self.parameters[k] = CategoricalHyperparameter(k, choices=[True, False],
+                                                               default_value=v.get('default', None))
+            else:
+                raise ValueError(f'Unknown hyperparameter type {param_type}')
+
+        cs.add_hyperparameters(self.parameters.values())
+
+        for condition, dic in self.conditions.items():
+            for k, v in dic.items():
+                cs.add_condition(InCondition(self.parameters[k], self.parameters[condition], v))
+
+        self.cs = cs
+
+    def random_config(self):
+        return self.cs.sample_configuration()
+
+    def default_config(self):
+        return self.cs.get_default_configuration()
+
+    def instance(self, params: Dict[str, Any] = None) -> BaseEstimator:
+        if params is None:
+            params = self.random_config()
+
+        module_name = self.class_path.rpartition(".")[0]
+        class_name = self.class_path.split(".")[-1]
+
+        module = importlib.import_module(module_name)
+        class_ = getattr(module, class_name)
+        return class_(**params)
 
     def __repr__(self):
         params = '\n'.join(
@@ -338,7 +410,6 @@ class Database(object):
     @try_with_session(commit=True)
     def start_algorithm(self,
                         dataset_id: int,
-                        name: str,
                         algorithm: str,
                         hyperparameter_values: Dict = None) -> Algorithm:
         """
@@ -347,7 +418,6 @@ class Database(object):
         """
         # TODO adapt
         algorithm = Algorithm(dataset_id=dataset_id,
-                              name=name,
                               algorithm=algorithm,
                               start_time=datetime.now(),
                               status=AlgorithmStatus.RUNNING)

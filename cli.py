@@ -41,7 +41,7 @@ def _enter_data(args):
     dataset = core.add_dataset(**dataset_conf.to_dict())
 
     # TODO only temporary, remove again
-    algo = core.add_algorithm(dataset.id, 'RandomForest', 'foo')
+    algo = core.add_algorithm(dataset.id, 'random_forest')
 
     return dataset.id
 
