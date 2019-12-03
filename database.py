@@ -1,7 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
 import hashlib
-import json
 from builtins import object
 from datetime import datetime
 from typing import Optional, List, Dict
@@ -9,10 +8,10 @@ from typing import Optional, List, Dict
 import numpy as np
 import pymysql
 from sklearn.model_selection import train_test_split
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, MetaData, Numeric, String, Text, create_engine
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from constants import ALGORITHM_STATUS, AlgorithmStatus, RunStatus
 from data import load_data
@@ -64,6 +63,155 @@ def try_with_session(commit: bool = False):
     return wrap
 
 
+Base = declarative_base()
+
+
+class Dataset(Base):
+    __tablename__ = 'datasets'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+
+    # columns necessary for loading/processing data
+    train_path = Column(String, nullable=False)
+    test_path = Column(String)
+    reference_path = Column(String)
+    processed = Column(Integer)
+
+    # metadata columns
+    # Type: Continuous
+    numberOfNumericAttributes = Column(Integer)
+
+    # Type: Categorical
+    numberOfCategoricalAttributes = Column(Integer)
+    numberOfBinaryAttributes = Column(Integer)
+
+    # Type: Generic
+    numberOfInstances = Column(Integer)
+    numberOfAttributes = Column(Integer)
+    dimensionality = Column(Integer)
+    numberOfMissingValues = Column(Integer)
+    percentageOfMissingValues = Column(Integer)
+    numberOfInstancesWithMissingValues = Column(Integer)
+    percentageOfInstancesWithMissingValues = Column(Integer)
+    numberOfClasses = Column(Integer)
+    classEntropy = Column(Integer)
+
+    def load(self, test_size=0.3, random_state=0,
+             aws_access_key=None, aws_secret_key=None):
+        data = load_data(self.name, self.train_path, aws_access_key, aws_secret_key)
+
+        if self.test_path:
+            if self.name.endswith('.csv'):
+                test_name = self.name.replace('.csv', '_test.csv')
+            else:
+                test_name = self.name + '_test'
+
+            test_data = load_data(test_name, self.test_path,
+                                  aws_access_key, aws_secret_key)
+            return data, test_data
+
+        else:
+            return train_test_split(data, test_size=test_size, random_state=random_state)
+
+    @staticmethod
+    def _make_name(path):
+        md5 = hashlib.md5(path.encode('utf-8'))
+        return md5.hexdigest()
+
+    def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None,
+                 aws_access_key=None, aws_secret_key=None):
+
+        self.train_path = train_path
+        self.test_path = test_path
+        self.reference_path = reference_path
+        self.name = name or self._make_name(train_path)
+        self.status = status
+
+        self.id = id
+
+    def __repr__(self):
+        base = "<%s: %s, %d classes, %d features, %d rows>"
+        return base % (self.name, self.numberOfClasses, self.numberOfAttributes, self.numberOfInstances)
+
+
+class Algorithm(Base):
+    __tablename__ = 'algorithms'
+
+    # relational columns
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
+
+    #
+    name = Column(String(100))
+    algorithm = Column(String(300), nullable=False)
+
+    # hyperparameter
+    accuracy = Column(Integer)
+    average_precision = Column(Integer)
+    f1_score = Column(Integer)
+    precision = Column(Integer)
+    recall = Column(Integer)
+    neg_log_loss = Column(Integer)
+    # base 64 encoding of the hyperparameter names and values
+    hyperparameter_values_64 = Column(Text)
+
+    # performance metrics
+    cv_judgment_metric = Column(Numeric(precision=20, scale=10))
+    cv_judgment_metric_stdev = Column(Numeric(precision=20, scale=10))
+    test_judgment_metric = Column(Numeric(precision=20, scale=10))
+
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
+    status = Column(Enum(*ALGORITHM_STATUS))
+    error_message = Column(Text)
+
+    @property
+    def hyperparameter_values(self):
+        return base_64_to_object(self.hyperparameter_values_64)
+
+    @hyperparameter_values.setter
+    def hyperparameter_values(self, value):
+        self.hyperparameter_values_64 = object_to_base_64(value)
+
+    @property
+    def mu_sigma_judgment_metric(self):
+        # compute the lower confidence bound on the cross-validated
+        # judgment metric
+        if self.cv_judgment_metric is None:
+            return None
+        return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
+
+    def __init__(self, algorithm, dataset_id, name=None, id=None, status=None, start_time=None, end_time=None,
+                 error_message=None):
+        self.algorithm = algorithm
+        self.name = name
+        self.status = status
+        self.id = id
+        self.dataset_id = dataset_id
+        self.start_time = start_time
+        self.end_time = end_time
+        self.error_message = error_message
+
+    def __repr__(self):
+        params = '\n'.join(
+            [
+                '\t{}: {}'.format(name, value)
+                for name, value in self.hyperparameter_values.items()
+            ]
+        )
+
+        to_print = [
+            'Algorithm id: {}'.format(self.id),
+            'Params chosen: \n{}'.format(params),
+            'Cross Validation Score: {:.3f} +- {:.3f}'.format(
+                self.cv_judgment_metric, self.cv_judgment_metric_stdev),
+            'Test Score: {:.3f}'.format(self.test_judgment_metric),
+        ]
+
+        return '\n'.join(to_print)
+
+
 class Database(object):
     def __init__(self, dialect: str, database: str, username: str = None, password: str = None,
                  host: str = None, port: int = None, query: str = None):
@@ -98,212 +246,6 @@ class Database(object):
         exist, it will not be updated with new schema -- after schema changes,
         the database must be destroyed and reinitialized.
         """
-        metadata = MetaData(bind=self.engine)
-        Base = declarative_base(metadata=metadata)
-        db = self
-
-        # TODO adapt Dataset and Algorithm tables
-        class Dataset(Base):
-            __tablename__ = 'datasets'
-
-            id = Column(Integer, primary_key=True, autoincrement=True)
-            name = Column(String(100), nullable=False)
-
-            # columns necessary for loading/processing data
-            train_path = Column(String, nullable=False)
-            test_path = Column(String)
-            reference_path = Column(String)
-            processed = Column(Integer)
-
-            # metadata columns
-            # Type: Continuous
-            numberOfNumericAttributes = Column(Integer)
-            # percentageOfNumericAttributes = Column(Integer)
-            # minMeansOfNumericAttributes = Column(Integer)
-            # minStdDevOfNumericAttributes = Column(Integer)
-            # minKurtosisOfNumericAttributes = Column(Integer)
-            # minSkewnessOfNumericalAttributes = Column(Integer)
-            # meanMeansOfNumericAttributes = Column(Integer)
-            # meanStdDevOfNumericAttributes = Column(Integer)
-            # meanKurtosisOfNumericAttributes = Column(Integer)
-            # meanSkewnessOfNumericalAttributes = Column(Integer)
-            # maxMeansOfNumericAttributes = Column(Integer)
-            # maxStdDevOfNumericAttributes = Column(Integer)
-            # maxKurtosisOfNumericAttributes = Column(Integer)
-            # maxSkewnessOfNumericalAttributes = Column(Integer)
-            # quartile1MeansOfNumericAttributes = Column(Integer)
-            # quartile1StdDevOfNumericAttributes = Column(Integer)
-            # quartile1KurtosisOfNumericAttributes = Column(Integer)
-            # quartile1SkewnessOfNumericalAttributes = Column(Integer)
-            # quartile2MeansOfNumericAttributes = Column(Integer)
-            # quartile2StdDevOfNumericAttributes = Column(Integer)
-            # quartile2KurtosisOfNumericAttributes = Column(Integer)
-            # quartile2SkewnessOfNumericalAttributes = Column(Integer)
-            # quartile3MeansOfNumericAttributes = Column(Integer)
-            # quartile3StdDevOfNumericAttributes = Column(Integer)
-            # quartile3KurtosisOfNumericAttributes = Column(Integer)
-            # quartile3SkewnessOfNumericalAttributes = Column(Integer)
-
-            # Type: Categorical
-            numberOfCategoricalAttributes = Column(Integer)
-            numberOfBinaryAttributes = Column(Integer)
-            # percentageOfCategoricalAttributes = Column(Integer)
-            # percentageOfBinaryAttributes = Column(Integer)
-            # minAttributeEntropy = Column(Integer)
-            # meanAttributeEntropy = Column(Integer)
-            # maxAttributeEntropy = Column(Integer)
-            # quartile1AttributeEntropy = Column(Integer)
-            # quartile2AttributeEntropy = Column(Integer)
-            # quartile3AttributeEntropy = Column(Integer)
-            # minMutualInformation = Column(Integer)
-            # meanMutualInformation = Column(Integer)
-            # maxMutualInformation = Column(Integer)
-            # quartile1MutualInformation = Column(Integer)
-            # quartile2MutualInformation = Column(Integer)
-            # quartile3MutualInformation = Column(Integer)
-            # equivalentNumberOfAttributes = Column(Integer)
-            # meanNoiseToSignalRatio = Column(Integer)
-            # minAttributeDistinctValues = Column(Integer)
-            # meanAttributeDistinctValues = Column(Integer)
-            # maxAttributeDistinctValues = Column(Integer)
-            # stdAttributeDistinctValues = Column(Integer)
-
-            # Type: Generic
-            numberOfInstances = Column(Integer)
-            numberOfAttributes = Column(Integer)
-            dimensionality = Column(Integer)
-            numberOfMissingValues = Column(Integer)
-            percentageOfMissingValues = Column(Integer)
-            numberOfInstancesWithMissingValues = Column(Integer)
-            percentageOfInstancesWithMissingValues = Column(Integer)
-            numberOfClasses = Column(Integer)
-            classEntropy = Column(Integer)
-            # minorityClassSize = Column(Integer)
-            # majorityClassSize = Column(Integer)
-            # minorityClassPercentage = Column(Integer)
-            # majorityClassPercentage = Column(Integer)
-
-            def load(self, test_size=0.3, random_state=0,
-                     aws_access_key=None, aws_secret_key=None):
-                data = load_data(self.name, self.train_path, aws_access_key, aws_secret_key)
-
-                if self.test_path:
-                    if self.name.endswith('.csv'):
-                        test_name = self.name.replace('.csv', '_test.csv')
-                    else:
-                        test_name = self.name + '_test'
-
-                    test_data = load_data(test_name, self.test_path,
-                                          aws_access_key, aws_secret_key)
-                    return data, test_data
-
-                else:
-                    return train_test_split(data, test_size=test_size, random_state=random_state)
-
-            @staticmethod
-            def _make_name(path):
-                md5 = hashlib.md5(path.encode('utf-8'))
-                return md5.hexdigest()
-
-            def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None,
-                         aws_access_key=None, aws_secret_key=None):
-
-                self.train_path = train_path
-                self.test_path = test_path
-                self.reference_path = reference_path
-                self.name = name or self._make_name(train_path)
-                self.status = status
-
-                self.id = id
-
-            def __repr__(self):
-                base = "<%s: %s, %d classes, %d features, %d rows>"
-                return base % (self.name, self.numberOfClasses, self.numberOfAttributes, self.numberOfInstances)
-
-        class Algorithm(Base):
-            __tablename__ = 'algorithms'
-
-            # relational columns
-            id = Column(Integer, primary_key=True, autoincrement=True)
-            dataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
-
-            #
-            name = Column(String(100))
-            algorithm = Column(String(300), nullable=False)
-
-            # hyperparameter
-            accuracy = Column(Integer)
-            average_precision = Column(Integer)
-            f1_score = Column(Integer)
-            precision = Column(Integer)
-            recall = Column(Integer)
-            neg_log_loss = Column(Integer)
-            # base 64 encoding of the hyperparameter names and values
-            hyperparameter_values_64 = Column(Text)
-
-            # performance metrics
-            cv_judgment_metric = Column(Numeric(precision=20, scale=10))
-            cv_judgment_metric_stdev = Column(Numeric(precision=20, scale=10))
-            test_judgment_metric = Column(Numeric(precision=20, scale=10))
-
-            start_time = Column(DateTime)
-            end_time = Column(DateTime)
-            status = Column(Enum(*ALGORITHM_STATUS))
-            error_message = Column(Text)
-
-            @property
-            def hyperparameter_values(self):
-                return base_64_to_object(self.hyperparameter_values_64)
-
-            @hyperparameter_values.setter
-            def hyperparameter_values(self, value):
-                self.hyperparameter_values_64 = object_to_base_64(value)
-
-            @property
-            def mu_sigma_judgment_metric(self):
-                # compute the lower confidence bound on the cross-validated
-                # judgment metric
-                if self.cv_judgment_metric is None:
-                    return None
-                return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
-
-            def __init__(self, algorithm, dataset_id, name=None, id=None, status=None, start_time=None, end_time=None,
-                         error_message=None):
-
-                self.algorithm = algorithm
-                self.name = name
-                self.status = status
-                self.id = id
-                self.dataset_id = dataset_id
-                self.start_time = start_time
-                self.end_time = end_time
-                self.error_message = error_message
-
-            def __repr__(self):
-
-                params = '\n'.join(
-                    [
-                        '\t{}: {}'.format(name, value)
-                        for name, value in self.hyperparameter_values.items()
-                    ]
-                )
-
-                to_print = [
-                    'Algorithm id: {}'.format(self.id),
-                    'Algorithm type: {}'.format(
-                        db.get_hyperpartition(self.hyperpartition_id).method),
-                    'Params chosen: \n{}'.format(params),
-                    'Cross Validation Score: {:.3f} +- {:.3f}'.format(
-                        self.cv_judgment_metric, self.cv_judgment_metric_stdev),
-                    'Test Score: {:.3f}'.format(self.test_judgment_metric),
-                ]
-
-                return '\n'.join(to_print)
-
-        Dataset.algorithms = relationship('Algorithm', order_by=Algorithm.id)
-
-        self.Dataset = Dataset
-        self.Algorithm = Algorithm
 
         Base.metadata.create_all(bind=self.engine)
 
@@ -314,14 +256,14 @@ class Database(object):
     @try_with_session()
     def get_dataset(self, dataset_id):
         """ Get a specific datarun. """
-        return self.session.query(self.Dataset).get(dataset_id)
+        return self.session.query(Dataset).get(dataset_id)
 
     @try_with_session()
     def get_datasets(self, ignore_pending: bool = False, ignore_running: bool = False,
-                     ignore_complete: bool = True) -> Optional[List['Database.Dataset']]:
+                     ignore_complete: bool = True) -> Optional[List[Dataset]]:
         # TODO adapt
 
-        query = self.session.query(self.Dataset)
+        query = self.session.query(Dataset)
         datasets = query.all()
 
         if not len(datasets):
@@ -330,7 +272,7 @@ class Database(object):
 
     @try_with_session()
     def get_algorithms(self, ignore_pending=False, ignore_running=False,
-                       ignore_complete=True) -> Optional[List['Database.Algorithm']]:
+                       ignore_complete=True) -> Optional[List[Algorithm]]:
         """
         Get a list of all datasets matching the chosen filters.
 
@@ -340,13 +282,13 @@ class Database(object):
             ignore_complete: if True, ignore completed algorithms
         """
         # TODO adapt
-        query = self.session.query(self.Algorithm)
+        query = self.session.query(Algorithm)
         if ignore_pending:
-            query = query.filter(self.Algorithm.status != RunStatus.PENDING)
+            query = query.filter(Algorithm.status != RunStatus.PENDING)
         if ignore_running:
-            query = query.filter(self.Algorithm.status != RunStatus.RUNNING)
+            query = query.filter(Algorithm.status != RunStatus.RUNNING)
         if ignore_complete:
-            query = query.filter(self.Algorithm.status != RunStatus.COMPLETE)
+            query = query.filter(Algorithm.status != RunStatus.COMPLETE)
 
         algorithms = query.all()
 
@@ -357,7 +299,7 @@ class Database(object):
     @try_with_session()
     def get_algorithm(self, algorithm_id):
         """ Get a specific algorithm. """
-        return self.session.query(self.Algorithm).get(algorithm_id)
+        return self.session.query(Algorithm).get(algorithm_id)
 
     # ##########################################################################
     # #  Methods to update the database  #######################################
@@ -365,7 +307,7 @@ class Database(object):
 
     @try_with_session(commit=True)
     def create_dataset(self, **kwargs):
-        dataset = self.Dataset(**kwargs)
+        dataset = Dataset(**kwargs)
         self.session.add(dataset)
         return dataset
 
@@ -377,24 +319,24 @@ class Database(object):
 
     @try_with_session(commit=True)
     def create_algorithm2(self, **kwargs):
-        algorithm = self.Algorithm(**kwargs)
+        algorithm = Algorithm(**kwargs)
         self.session.add(algorithm)
         return algorithm
 
     @try_with_session(commit=True)
     def start_algorithm(self, dataset_id: int, name: str, algorithm: str,
-                        hyperparameter_values: Dict) -> 'Database.Algorithm':
+                        hyperparameter_values: Dict) -> Algorithm:
         """
         Save a new, fully qualified algorithm object to the database.
         Returns: the ID of the newly-created algorithm
         """
         # TODO adapt
-        algorithm = self.Algorithm(dataset_id=dataset_id,
-                                   name=name,
-                                   algorithm=algorithm,
-                                   hyperparameter_values=hyperparameter_values,
-                                   start_time=datetime.now(),
-                                   status=AlgorithmStatus.RUNNING)
+        algorithm = Algorithm(dataset_id=dataset_id,
+                              name=name,
+                              algorithm=algorithm,
+                              hyperparameter_values=hyperparameter_values,
+                              start_time=datetime.now(),
+                              status=AlgorithmStatus.RUNNING)
         self.session.add(algorithm)
         return algorithm
 
@@ -405,7 +347,7 @@ class Database(object):
         it as complete.
         """
         # TODO adapt
-        algorithm = self.session.query(self.Algorithm).get(algorithm_id)
+        algorithm = self.session.query(Algorithm).get(algorithm_id)
 
         algorithm.accuracy = accuracy
         algorithm.average_precision = average_precision
@@ -423,7 +365,7 @@ class Database(object):
         the algorithm's hyperpartiton has produced too many erring algorithms, mark it
         as errored as well.
         """
-        algorithm = self.session.query(self.Algorithm).get(algorithm_id)
+        algorithm = self.session.query(Algorithm).get(algorithm_id)
         algorithm.error_message = error_message
         algorithm.status = AlgorithmStatus.ERRORED
         algorithm.end_time = datetime.now()
