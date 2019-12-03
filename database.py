@@ -119,8 +119,13 @@ class Dataset(Base):
         md5 = hashlib.md5(path.encode('utf-8'))
         return md5.hexdigest()
 
-    def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None,
-                 aws_access_key=None, aws_secret_key=None):
+    def __init__(self,
+                 train_path,
+                 test_path=None,
+                 reference_path=None,
+                 status=None,
+                 name=None,
+                 id=None):
 
         self.train_path = train_path
         self.test_path = test_path
@@ -182,7 +187,14 @@ class Algorithm(Base):
             return None
         return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
 
-    def __init__(self, algorithm, dataset_id, name=None, id=None, status=None, start_time=None, end_time=None,
+    def __init__(self,
+                 algorithm,
+                 dataset_id,
+                 name=None,
+                 id=None,
+                 status=None,
+                 start_time=None,
+                 end_time=None,
                  error_message=None):
         self.algorithm = algorithm
         self.name = name
@@ -318,14 +330,17 @@ class Database(object):
     #     return algorithm_obj
 
     @try_with_session(commit=True)
-    def create_algorithm2(self, **kwargs):
+    def create_algorithm(self, **kwargs):
         algorithm = Algorithm(**kwargs)
         self.session.add(algorithm)
         return algorithm
 
     @try_with_session(commit=True)
-    def start_algorithm(self, dataset_id: int, name: str, algorithm: str,
-                        hyperparameter_values: Dict) -> Algorithm:
+    def start_algorithm(self,
+                        dataset_id: int,
+                        name: str,
+                        algorithm: str,
+                        hyperparameter_values: Dict = None) -> Algorithm:
         """
         Save a new, fully qualified algorithm object to the database.
         Returns: the ID of the newly-created algorithm
@@ -334,7 +349,6 @@ class Database(object):
         algorithm = Algorithm(dataset_id=dataset_id,
                               name=name,
                               algorithm=algorithm,
-                              hyperparameter_values=hyperparameter_values,
                               start_time=datetime.now(),
                               status=AlgorithmStatus.RUNNING)
         self.session.add(algorithm)
