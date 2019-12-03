@@ -84,17 +84,22 @@ class Core(object):
             Dataset:
                 The created dataset.
         """
-
         # TODO calculate meta features
         # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
         return self.db.create_dataset(
             train_path=train_path,
-            test_path=test_path,
-            reference_path=reference_path,
+            test_path='test_path',
+            reference_path='reference_path',
             name=name,
             aws_access_key=self.s3_access_key,
-            aws_secret_key=self.s3_secret_key,
+            aws_secret_key=self.s3_secret_key
+        )
+
+    def add_algorithm(self, algorithm, name=None):
+        return self.db.start_algorithm(
+            algorithm='algorithm',
+            name='name'
         )
 
     def work(self, choose_randomly=True, wait=True, verbose=False):

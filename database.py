@@ -102,7 +102,7 @@ class Database(object):
         Base = declarative_base(metadata=metadata)
         db = self
 
-        # TODO adapt Datarun, Dataset and Algorithm tables
+        # TODO adapt Dataset and Algorithm tables
         class Dataset(Base):
             __tablename__ = 'datasets'
 
@@ -205,8 +205,8 @@ class Database(object):
                 md5 = hashlib.md5(path.encode('utf-8'))
                 return md5.hexdigest()
 
-            def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None, aws_access_key=None,
-                         aws_secret_key=None):
+            def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None,
+                         aws_access_key=None, aws_secret_key=None):
 
                 self.train_path = train_path
                 self.test_path = test_path
@@ -225,11 +225,11 @@ class Database(object):
 
             # relational columns
             id = Column(Integer, primary_key=True, autoincrement=True)
-            inputdataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
+            dataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
 
             #
             name = Column(String(100))
-            algorithm = Column(String(300))
+            algorithm = Column(String(300), nullable=False)
 
             # hyperparameter
             accuracy = Column(Integer)
@@ -239,7 +239,7 @@ class Database(object):
             recall = Column(Integer)
             neg_log_loss = Column(Integer)
             # base 64 encoding of the hyperparameter names and values
-            hyperparameter_values_64 = Column(Text, nullable=False)
+            hyperparameter_values_64 = Column(Text)
 
             # performance metrics
             cv_judgment_metric = Column(Numeric(precision=20, scale=10))
@@ -248,7 +248,7 @@ class Database(object):
 
             start_time = Column(DateTime)
             end_time = Column(DateTime)
-            status = Column(Enum(*ALGORITHM_STATUS), nullable=False)
+            status = Column(Enum(*ALGORITHM_STATUS))
             error_message = Column(Text)
 
             @property
@@ -266,6 +266,18 @@ class Database(object):
                 if self.cv_judgment_metric is None:
                     return None
                 return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
+
+            def __init__(self, algorithm, dataset_id, name=None, id=None, status=None, start_time=None, end_time=None,
+                         error_message=None):
+
+                self.algorithm = algorithm
+                self.name = name
+                self.status = status
+                self.id = id
+                self.dataset_id = dataset_id
+                self.start_time = start_time
+                self.end_time = end_time
+                self.error_message = error_message
 
             def __repr__(self):
 
@@ -357,8 +369,20 @@ class Database(object):
         self.session.add(dataset)
         return dataset
 
+    # @try_with_session(commit=True)
+    # def create_algorithm(self, dataset_id: int, name: str, algorithm: str) -> 'Database.Algorithm':
+    #     algorithm_obj = self.Algorithm(dataset_id=dataset_id, name=name, algorithm=algorithm)
+    #     self.session.add(algorithm_obj)
+    #     return algorithm_obj
+
     @try_with_session(commit=True)
-    def start_algorithm(self, dataset_id: int, host: str, algorithm: str,
+    def create_algorithm2(self, **kwargs):
+        algorithm = self.Algorithm(**kwargs)
+        self.session.add(algorithm)
+        return algorithm
+
+    @try_with_session(commit=True)
+    def start_algorithm(self, dataset_id: int, name: str, algorithm: str,
                         hyperparameter_values: Dict) -> 'Database.Algorithm':
         """
         Save a new, fully qualified algorithm object to the database.
@@ -366,7 +390,7 @@ class Database(object):
         """
         # TODO adapt
         algorithm = self.Algorithm(dataset_id=dataset_id,
-                                   host=host,
+                                   name=name,
                                    algorithm=algorithm,
                                    hyperparameter_values=hyperparameter_values,
                                    start_time=datetime.now(),
@@ -375,8 +399,7 @@ class Database(object):
         return algorithm
 
     @try_with_session(commit=True)
-    def complete_algorithm(self, algorithm_id, model_location,
-                           metrics_location, cv_score, cv_stdev, test_score):
+    def complete_algorithm(self, algorithm_id, accuracy, average_precision, f1_score, precision, recall, neg_log_loss):
         """
         Set all the parameters on a algorithm that haven't yet been set, and mark
         it as complete.
@@ -384,11 +407,12 @@ class Database(object):
         # TODO adapt
         algorithm = self.session.query(self.Algorithm).get(algorithm_id)
 
-        algorithm.model_location = model_location
-        algorithm.metrics_location = metrics_location
-        algorithm.cv_judgment_metric = cv_score
-        algorithm.cv_judgment_metric_stdev = cv_stdev
-        algorithm.test_judgment_metric = test_score
+        algorithm.accuracy = accuracy
+        algorithm.average_precision = average_precision
+        algorithm.f1_score = f1_score
+        algorithm.precision = precision
+        algorithm.recall = recall
+        algorithm.neg_log_loss = neg_log_loss
         algorithm.end_time = datetime.now()
         algorithm.status = AlgorithmStatus.COMPLETE
 
