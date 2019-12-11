@@ -79,6 +79,7 @@ class Dataset(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
+    class_target = Column(String(100))
 
     # columns necessary for loading/processing data
     train_path = Column(String, nullable=False)
@@ -87,23 +88,55 @@ class Dataset(Base):
     processed = Column(Integer)
 
     # metadata columns
-    # Type: Continuous
-    numberOfNumericAttributes = Column(Integer)
+    nr_inst = Column(Numeric)
+    nr_attr = Column(Numeric)
+    nr_class = Column(Numeric)
+    nr_outliers = Column(Numeric)
 
-    # Type: Categorical
-    numberOfCategoricalAttributes = Column(Integer)
-    numberOfBinaryAttributes = Column(Integer)
+    skewness_mean = Column(Numeric)
+    skewness_sd = Column(Numeric)
+    kurtosis_mean = Column(Numeric)
+    kurtosis_sd = Column(Numeric)
+    cor_mean = Column(Numeric)
+    cor_sd = Column(Numeric)
+    cov_mean = Column(Numeric)
+    cov_sd = Column(Numeric)
+    attr_conc_mean = Column(Numeric)
+    attr_conc_sd = Column(Numeric)
+    sparsity_mean = Column(Numeric)
+    sparsity_sd = Column(Numeric)
+    gravity = Column(Numeric)
+    var_mean = Column(Numeric)
+    var_sd = Column(Numeric)
 
-    # Type: Generic
-    numberOfInstances = Column(Integer)
-    numberOfAttributes = Column(Integer)
-    dimensionality = Column(Integer)
-    numberOfMissingValues = Column(Integer)
-    percentageOfMissingValues = Column(Integer)
-    numberOfInstancesWithMissingValues = Column(Integer)
-    percentageOfInstancesWithMissingValues = Column(Integer)
-    numberOfClasses = Column(Integer)
-    classEntropy = Column(Integer)
+    class_ent = Column(Numeric)
+    attr_ent_mean = Column(Numeric)
+    attr_ent_sd = Column(Numeric)
+    mut_inf_mean = Column(Numeric)
+    mut_inf_sd = Column(Numeric)
+    eq_num_attr = Column(Numeric)
+    ns_ratio = Column(Numeric)
+
+    nodes = Column(Numeric)
+    leaves = Column(Numeric)
+    leaves_branch_mean = Column(Numeric)
+    leaves_branch_sd = Column(Numeric)
+    nodes_per_attr = Column(Numeric)
+    leaves_per_class_mean = Column(Numeric)
+    leaves_per_class_sd = Column(Numeric)
+    var_importance_mean = Column(Numeric)
+    var_importance_sd = Column(Numeric)
+
+    one_nn_mean = Column(Numeric)
+    one_nn_sd = Column(Numeric)
+    best_node_mean = Column(Numeric)
+    best_node_sd = Column(Numeric)
+    best_random = Column(Numeric)
+    best_worst = Column(Numeric)
+    linear_discr_mean = Column(Numeric)
+    linear_discr_sd = Column(Numeric)
+    naive_bayes_mean = Column(Numeric)
+    naive_bayes_sd = Column(Numeric)
 
     def load(self, test_size=0.3, random_state=0,
              aws_access_key=None, aws_secret_key=None):
@@ -127,21 +160,73 @@ class Dataset(Base):
         md5 = hashlib.md5(path.encode('utf-8'))
         return md5.hexdigest()
 
-    def __init__(self,
-                 train_path,
-                 test_path=None,
-                 reference_path=None,
-                 status=None,
-                 name=None,
-                 id=None):
+    def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None,
+                 nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
+                 kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
+                 attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
+                 var_mean=None, var_sd=None, class_ent=None, attr_ent_mean=None, attr_ent_sd=None, mut_inf_mean=None,
+                 mut_inf_sd=None, eq_num_attr=None, ns_ratio=None, nodes=None, leaves=None,
+                 leaves_branch_mean=None, leaves_branch_sd=None, nodes_per_attr=None, leaves_per_class_mean=None,
+                 leaves_per_class_sd=None, var_importance_mean=None, var_importance_sd=None, one_nn_mean=None,
+                 one_nn_sd=None, best_node_mean=None, best_node_sd=None, best_random=None, best_worst=None,
+                 linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None):
 
         self.train_path = train_path
         self.test_path = test_path
         self.reference_path = reference_path
         self.name = name or self._make_name(train_path)
         self.status = status
-
         self.id = id
+
+        self.nr_inst = nr_inst
+        self.nr_attr = nr_attr
+        self.nr_class = nr_class
+        self.nr_outliers = nr_outliers
+
+        self.skewness_mean = skewness_mean
+        self.skewness_sd = skewness_sd
+        self.kurtosis_mean = kurtosis_mean
+        self.kurtosis_sd = kurtosis_sd
+        self.cor_mean = cor_mean
+        self.cor_sd = cor_sd
+        self.cov_mean = cov_mean
+        self.cov_sd = cov_sd
+        self.attr_conc_mean = attr_conc_mean
+        self.attr_conc_sd = attr_conc_sd
+        self.sparsity_mean = sparsity_mean
+        self.sparsity_sd = sparsity_sd
+        self.gravity = gravity
+        self.var_mean = var_mean
+        self.var_sd = var_sd
+
+        self.class_ent = class_ent
+        self.attr_ent_mean = attr_ent_mean
+        self.attr_ent_sd = attr_ent_sd
+        self.mut_inf_mean = mut_inf_mean
+        self.mut_inf_sd = mut_inf_sd
+        self.eq_num_attr = eq_num_attr
+        self.ns_ratio = ns_ratio
+
+        self.nodes = nodes
+        self.leaves = leaves
+        self.leaves_branch_mean = leaves_branch_mean
+        self.leaves_branch_sd = leaves_branch_sd
+        self.nodes_per_attr = nodes_per_attr
+        self.leaves_per_class_mean = leaves_per_class_mean
+        self.leaves_per_class_sd = leaves_per_class_sd
+        self.var_importance_mean = var_importance_mean
+        self.var_importance_sd = var_importance_sd
+
+        self.one_nn_mean = one_nn_mean
+        self.one_nn_sd = one_nn_sd
+        self.best_node_mean = best_node_mean
+        self.best_node_sd = best_node_sd
+        # self.best_random=best_random
+        # self.best_worst=best_worst
+        self.linear_discr_mean = linear_discr_mean
+        self.linear_discr_sd = linear_discr_sd
+        self.naive_bayes_mean = naive_bayes_mean
+        self.naive_bayes_sd = naive_bayes_sd
 
     def __repr__(self):
         base = "<%s: %s, %d classes, %d features, %d rows>"
@@ -202,6 +287,7 @@ class Algorithm(Base):
                  start_time: datetime = None,
                  end_time: datetime = None,
                  error_message: str = None):
+
         self.algorithm: str = algorithm
         self.status = status
         self.id: Optional[int] = id
@@ -209,13 +295,15 @@ class Algorithm(Base):
         self.start_time: Optional[datetime] = start_time
         self.end_time: Optional[datetime] = end_time
         self.error_message: Optional[str] = error_message
+        self._load_cs()
 
     def _load_cs(self):
         """
         method: method code or path to JSON file containing all the information
             needed to specify this enumerator.
         """
-        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm)
+        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm) + '.json'
+
         with open(config_path) as f:
             config = json.load(f)
 
@@ -394,18 +482,6 @@ class Database(object):
         dataset = Dataset(**kwargs)
         self.session.add(dataset)
         return dataset
-
-    # @try_with_session(commit=True)
-    # def create_algorithm(self, dataset_id: int, name: str, algorithm: str) -> 'Database.Algorithm':
-    #     algorithm_obj = self.Algorithm(dataset_id=dataset_id, name=name, algorithm=algorithm)
-    #     self.session.add(algorithm_obj)
-    #     return algorithm_obj
-
-    @try_with_session(commit=True)
-    def create_algorithm(self, **kwargs):
-        algorithm = Algorithm(**kwargs)
-        self.session.add(algorithm)
-        return algorithm
 
     @try_with_session(commit=True)
     def start_algorithm(self,

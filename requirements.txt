@@ -1,3 +1,4 @@
+pymfe
 ConfigSpace
 botocore
 requests

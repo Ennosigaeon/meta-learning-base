@@ -9,7 +9,9 @@ import random
 import time
 from operator import attrgetter
 
-from data import store_data
+from pymfe.mfe import MFE
+
+from data import store_data, load_data
 from database import Database
 from tqdm import tqdm
 
@@ -87,11 +89,126 @@ class Core(object):
         # TODO calculate meta features
         # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
+        # TODO alle 40 Meta Features von Vanschoren berechnen. Aber zusammengefasst/summarized 06.12.19
+        df = load_data(train_path)
+        X, y = df.drop('class', axis=1), df['class']
+
+        mfe = MFE(
+            features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
+                       'attr_conc', 'sparsity', 'gravity', 'var', 'class_ent', 'attr_ent', 'mut_inf', 'eq_num_attr',
+                       'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr', 'var_importance', 'one_nn',
+                       'best_node', 'best_random', 'best_worst', 'linear_discr', 'naive_bayes', 'leaves_per_class']),
+            random_state=42
+        )
+        # noinspection PyTypeChecker
+        mfe.fit(X.values, y.values)
+        ft = mfe.extract(cat_cols='auto', suppress_warnings=True)
+        nr_inst = ft[1][30]
+        nr_attr = ft[1][28]
+        nr_class = ft[1][29]
+        nr_outliers = ft[1][31]
+
+        skewness_mean = ft[1][35]
+        skewness_sd = ft[1][36]
+        kurtosis_mean = ft[1][13]
+        kurtosis_sd = ft[1][14]
+        cor_mean = ft[1][7]
+        cor_sd = ft[1][8]
+        cov_mean = ft[1][9]
+        cov_sd = ft[1][10]
+        attr_conc_mean = ft[1][0]
+        attr_conc_sd = ft[1][1]
+        sparsity_mean = ft[1][37]
+        sparsity_sd = ft[1][38]
+        gravity = ft[1][12]
+        var_mean = ft[1][39]
+        var_sd = ft[1][40]
+
+        class_ent = ft[1][6]
+        attr_ent_mean = ft[1][2]
+        attr_ent_sd = ft[1][3]
+        mut_inf_mean = ft[1][22]
+        mut_inf_sd = ft[1][23]
+        eq_num_attr = ft[1][11]
+        ns_ratio = ft[1][32]
+
+        nodes = ft[1][26]
+        leaves = ft[1][15]
+        leaves_branch_mean = ft[1][16]
+        leaves_branch_sd = ft[1][17]
+        nodes_per_attr = ft[1][27]
+        leaves_per_class_mean = ft[1][18]
+        leaves_per_class_sd = ft[1][19]
+        var_importance_mean = ft[1][41]
+        var_importance_sd = ft[1][42]
+
+        one_nn_mean = ft[1][33]
+        one_nn_sd = ft[1][34]
+        best_node_mean = ft[1][4]
+        best_node_sd = ft[1][5]
+        # best_random = ft[1][0]
+        # best_worst = ft[1][0]
+        linear_discr_mean = ft[1][20]
+        linear_discr_sd = ft[1][21]
+        naive_bayes_mean = ft[1][24]
+        naive_bayes_sd = ft[1][25]
+
         return self.db.create_dataset(
             train_path=train_path,
             test_path='test_path',
             reference_path='reference_path',
-            name=name
+            name=name,
+
+            nr_inst=nr_inst,
+            nr_attr=nr_attr,
+            nr_class=nr_class,
+            nr_outliers=nr_outliers,
+
+            skewness_mean=skewness_mean,
+            skewness_sd=skewness_sd,
+            kurtosis_mean=kurtosis_mean,
+            kurtosis_sd=kurtosis_sd,
+            cor_mean=cor_mean,
+            cor_sd=cor_sd,
+            cov_mean=cov_mean,
+            cov_sd=cov_sd,
+            attr_conc_mean=attr_conc_mean,
+            attr_conc_sd=attr_conc_sd,
+            sparsity_mean=sparsity_mean,
+            sparsity_sd=sparsity_sd,
+            gravity=gravity,
+            var_mean=var_mean,
+            var_sd=var_sd,
+
+            class_ent=class_ent,
+            attr_ent_mean=attr_ent_mean,
+            attr_ent_sd=attr_ent_sd,
+            mut_inf_mean=mut_inf_mean,
+            mut_inf_sd=mut_inf_sd,
+            eq_num_attr=eq_num_attr,
+            ns_ratio=ns_ratio,
+
+            nodes=nodes,
+            leaves=leaves,
+            leaves_branch_mean=leaves_branch_mean,
+            leaves_branch_sd=leaves_branch_sd,
+            nodes_per_attr=nodes_per_attr,
+            leaves_per_class_mean=leaves_per_class_mean,
+            leaves_per_class_sd=leaves_per_class_sd,
+            var_importance_mean=var_importance_mean,
+            var_importance_sd=var_importance_sd,
+
+            one_nn_mean=one_nn_mean,
+            one_nn_sd=one_nn_sd,
+            best_node_mean=best_node_mean,
+            best_node_sd=best_node_sd,
+            # best_random=best_random,
+            # best_worst=best_worst,
+            linear_discr_mean=linear_discr_mean,
+            linear_discr_sd=linear_discr_sd,
+            naive_bayes_mean=naive_bayes_mean,
+            naive_bayes_sd=naive_bayes_sd
+
         )
 
     def add_algorithm(self, ds_id: int, algorithm: str):
@@ -139,6 +256,7 @@ class Core(object):
                 ds = sorted(datasets, key=attrgetter('id'))[0]
 
             # say we've started working on this dataset, if we haven't already
+            # noinspection PyTypeChecker
             self.db.mark_dataset_running(ds.id)
 
             LOGGER.info('Computing on datarun %d' % ds.id)
