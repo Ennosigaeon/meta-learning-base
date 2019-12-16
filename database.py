@@ -91,6 +91,10 @@ class Dataset(Base):
     nr_inst = Column(Numeric)
     nr_attr = Column(Numeric)
     nr_class = Column(Numeric)
+    nr_missing_values = Column(Numeric)
+    pct_missing_values = Column(Numeric)
+    nr_inst_mv = Column(Numeric)
+    nr_attr_mv = Column(Numeric)
     nr_outliers = Column(Numeric)
 
     skewness_mean = Column(Numeric)
@@ -169,7 +173,8 @@ class Dataset(Base):
                  leaves_branch_mean=None, leaves_branch_sd=None, nodes_per_attr=None, leaves_per_class_mean=None,
                  leaves_per_class_sd=None, var_importance_mean=None, var_importance_sd=None, one_nn_mean=None,
                  one_nn_sd=None, best_node_mean=None, best_node_sd=None, best_random=None, best_worst=None,
-                 linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None):
+                 linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
+                 nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None):
 
         self.train_path = train_path
         self.test_path = test_path
@@ -181,6 +186,10 @@ class Dataset(Base):
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
         self.nr_class = nr_class
+        self.nr_missing_values = nr_missing_values
+        self.pct_missing_values = pct_missing_values
+        self.nr_inst_mv = nr_inst_mv
+        self.nr_attr_mv = nr_attr_mv
         self.nr_outliers = nr_outliers
 
         self.skewness_mean = skewness_mean
@@ -230,7 +239,7 @@ class Dataset(Base):
 
     def __repr__(self):
         base = "<%s: %s, %d classes, %d features, %d rows>"
-        return base % (self.name, self.numberOfClasses, self.numberOfAttributes, self.numberOfInstances)
+        return base % (self.name, self.nr_class, self.nr_attr, self.nr_inst)
 
 
 class Algorithm(Base):

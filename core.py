@@ -9,6 +9,9 @@ import random
 import time
 from operator import attrgetter
 
+import numpy as np
+from autosklearn.metalearning.metafeatures.metafeature import MetaFeature, HelperFunction
+from numpy.linalg import LinAlgError
 from pymfe.mfe import MFE
 
 from data import store_data, load_data
@@ -86,13 +89,18 @@ class Core(object):
             Dataset:
                 The created dataset.
         """
-        # TODO calculate meta features
+
         # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
-        # TODO alle 40 Meta Features von Vanschoren berechnen. Aber zusammengefasst/summarized 06.12.19
+        # ##########################################################################
+        # #  Extracting Meta Features from pymfe  ##################################
+        # ##########################################################################
+
+        # Loading train_path
         df = load_data(train_path)
         X, y = df.drop('class', axis=1), df['class']
 
+        # Selecting Meta Features and extracting them
         mfe = MFE(
             features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
                        'attr_conc', 'sparsity', 'gravity', 'var', 'class_ent', 'attr_ent', 'mut_inf', 'eq_num_attr',
@@ -103,6 +111,8 @@ class Core(object):
         # noinspection PyTypeChecker
         mfe.fit(X.values, y.values)
         ft = mfe.extract(cat_cols='auto', suppress_warnings=True)
+
+        # Mapping values to Meta Feature variables
         nr_inst = ft[1][30]
         nr_attr = ft[1][28]
         nr_class = ft[1][29]
@@ -153,6 +163,69 @@ class Core(object):
         naive_bayes_mean = ft[1][24]
         naive_bayes_sd = ft[1][25]
 
+        # ##########################################################################
+        # #  Extracting Meta Features with Auto-Sklearn  ###########################
+        # ##########################################################################
+
+        class NumberOfMissingValues(MetaFeature):
+            def _calculate(self, X, y, categorical):
+                missing = ~np.isfinite(X)
+                missing = missing.sum().sum()
+                return missing
+
+        class PercentageOfMissingValues(MetaFeature):
+            def _calculate(self, X, y, categorical):
+                missing = ~np.isfinite(X)
+                missing = missing.sum().sum()
+                return float(missing) / \
+                       float(X.shape[0] * X.shape[1])
+
+        class NumberOfInstancesWithMissingValues(MetaFeature):
+            def _calculate(self, X, y, categorical):
+                missing = ~np.isfinite(X)
+                num_missing = missing.sum(axis=1)
+                return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
+
+        class NumberOfFeaturesWithMissingValues(MetaFeature):
+            def _calculate(self, X, y, categorical):
+                missing = ~np.isfinite(X)
+                num_missing = missing.sum(axis=0)
+                return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
+
+        # TODO not working
+        class PCA(HelperFunction):
+            def _calculate(self, X, y, categorical):
+                import sklearn.decomposition
+                pca = sklearn.decomposition.PCA(copy=True)
+                rs = np.random.RandomState(42)
+                indices = np.arange(X.shape[0])
+                for i in range(10):
+                    try:
+                        rs.shuffle(indices)
+                        pca.fit(X[indices])
+                        return pca
+                    except LinAlgError as e:
+                        pass
+                self.logger.warning("Failed to compute a Principle Component Analysis")
+                return None
+
+        class PCAFractionOfComponentsFor95PercentVariance(MetaFeature):
+            def _calculate(self, X, y, categorical):
+                pca_ = PCA._calculate(self, X, y, categorical=True)
+                if pca_ is None:
+                    return np.NaN
+                sum_ = 0.
+                idx = 0
+                while sum_ < 0.95 and idx < len(pca_.explained_variance_ratio_):
+                    sum_ += pca_.explained_variance_ratio_[idx]
+                    idx += 1
+                return float(idx) / float(X.shape[1])
+
+        nr_missing_values = NumberOfMissingValues._calculate(self, X, y, categorical=True)
+        pct_missing_values = PercentageOfMissingValues._calculate(self, X, y, categorical=True)
+        nr_inst_mv = NumberOfInstancesWithMissingValues._calculate(self, X, y, categorical=True)
+        nr_attr_mv = NumberOfFeaturesWithMissingValues._calculate(self, X, y, categorical=True)
+
         return self.db.create_dataset(
             train_path=train_path,
             test_path='test_path',
@@ -162,6 +235,10 @@ class Core(object):
             nr_inst=nr_inst,
             nr_attr=nr_attr,
             nr_class=nr_class,
+            nr_missing_values=nr_missing_values,
+            pct_missing_values=pct_missing_values,
+            nr_inst_mv=nr_inst_mv,
+            nr_attr_mv=nr_attr_mv,
             nr_outliers=nr_outliers,
 
             skewness_mean=skewness_mean,
