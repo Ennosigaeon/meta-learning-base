@@ -194,7 +194,7 @@ class Core(object):
                 num_missing = missing.sum(axis=0)
                 return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
 
-        class ClassOccurrences(HelperFunction):
+        class ClassOccurrences(MetaFeature):
             def _calculate(self, X, y, categorical):
                 if len(y.shape) == 2:
                     occurrences = []
@@ -207,47 +207,45 @@ class Core(object):
                         occurrence_dict[value] += 1
                     return occurrence_dict
 
-        # noinspection PyTypeChecker
-        occurrences = ClassOccurrences._calculate(self, X, y, categorical=True)
-        # noinspection PyTypeChecker
-        occurrence_dict = ClassOccurrences._calculate(self, X, y, categorical=True)
-
         class ClassProbabilityMean(MetaFeature):
             def _calculate(self, X, y, categorical):
+                occurrence_dict = ClassOccurrences()(X, y, categorical)
+
                 if len(y.shape) == 2:
                     occurrences = []
                     for i in range(y.shape[1]):
                         occurrences.extend(
-                            [occurrence for occurrence in occurrence_dict[
-                                i].values()])
+                            [occurrence for occurrence in occurrence_dict[i].value.values()])
                     occurrences = np.array(occurrences)
                 else:
-                    occurrences = np.array([occurrence for occurrence in occurrence_dict.values()],
-                                          dtype=np.float64)
+                    occurrences = np.array([occurrence for occurrence in occurrence_dict.value.values()],
+                                           dtype=np.float64)
                 return (occurrences / y.shape[0]).mean()
 
         class ClassProbabilitySTD(MetaFeature):
             def _calculate(self, X, y, categorical):
+                occurrence_dict = ClassOccurrences()(X, y, categorical)
+
                 if len(y.shape) == 2:
                     stds = []
                     for i in range(y.shape[1]):
                         std = np.array(
                             [occurrence for occurrence in occurrence_dict[
-                                i].values()],
+                                i].value.values()],
                             dtype=np.float64)
                         std = (std / y.shape[0]).std()
                         stds.append(std)
                     return np.mean(stds)
                 else:
-                    occurences = np.array([occurrence for occurrence in occurrence_dict.values()],
+                    occurences = np.array([occurrence for occurrence in occurrence_dict.value.values()],
                                           dtype=np.float64)
                     return (occurences / y.shape[0]).std()
 
-        # TODO PCA not working yet
+        # # TODO PCA not working yet
         # class PCA(HelperFunction):
         #     def _calculate(self, X, y, categorical):
-        #         import sklearn.decomposition
-        #         pca = sklearn.decomposition.PCA(copy=True)
+        #         from sklearn.decomposition.pca import PCA
+        #         pca = PCA(copy=True)
         #         rs = np.random.RandomState(42)
         #         indices = np.arange(X.shape[0])
         #         for i in range(10):
@@ -260,12 +258,10 @@ class Core(object):
         #         self.logger.warning("Failed to compute a Principle Component Analysis")
         #         return None
         #
-        # # noinspection PyTypeChecker
-        # pca = PCA._calculate(self, X, y, categorical=True)
-        #
         # class PCAFractionOfComponentsFor95PercentVariance(MetaFeature):
         #     def _calculate(self, X, y, categorical):
-        #         pca_ = pca
+        #         pca_ = PCA()(X, y, categorical)
+        #
         #         if pca_ is None:
         #             return np.NaN
         #         sum_ = 0.
@@ -277,7 +273,7 @@ class Core(object):
         #
         # class PCASkewnessFirstPC(MetaFeature):
         #     def _calculate(self, X, y, categorical):
-        #         pca_ = pca
+        #         pca_ = PCA()(X, y, categorical)
         #         if pca_ is None:
         #             return np.NaN
         #         components = pca_.components_
@@ -302,6 +298,10 @@ class Core(object):
         class_prob_mean = ClassProbabilityMean._calculate(self, X, y, categorical=True)
         # noinspection PyTypeChecker
         class_prob_std = ClassProbabilitySTD._calculate(self, X, y, categorical=True)
+        # noinspection PyTypeChecker
+        # pca_95 = PCAFractionOfComponentsFor95PercentVariance._calculate(self, X, y, categorical=True)
+        # noinspection PyTypeChecker
+        # pca_skewness = PCASkewnessFirstPC._calculate(self, X, y, categorical=True)
 
         return self.db.create_dataset(
             train_path=train_path,
@@ -406,13 +406,13 @@ class Core(object):
                     LOGGER.info('No datasets found. Exiting.')
                     break
 
-            # either choose a ds randomly between priority, or take the ds with the lowest ID
+            # either choose a dataset randomly between priority, or take the dataset with the lowest ID
             if choose_randomly:
                 ds = random.choice(datasets)
             else:
                 ds = sorted(datasets, key=attrgetter('id'))[0]
 
-            # say we've started working on this dataset, if we haven't already
+            # if we haven't alreadystarted working on this dataset, mark it as started working
             # noinspection PyTypeChecker
             self.db.mark_dataset_running(ds.id)
 
@@ -422,6 +422,7 @@ class Core(object):
                             s3_secret_key=self.s3_secret_key, s3_bucket=self.s3_bucket, models_dir=self.models_dir,
                             metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
 
+            # progress bar
             try:
                 pbar = tqdm(
                     total=ds.budget,
@@ -430,6 +431,7 @@ class Core(object):
                     disable=not verbose
                 )
 
+            # as long as there are datasets which aren't marked as completed yet -> run_algorithm
                 while ds.status != RunStatus.COMPLETE:
                     worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)

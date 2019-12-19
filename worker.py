@@ -120,6 +120,7 @@ class Worker(object):
             LOGGER.warning('Dataset %d has ended.' % self.dataset.id)
             return
 
+        # choose a random algorithm to work on the dataset
         try:
             LOGGER.debug('Choosing algorithm...')
             algorithm = random.choice(ALGORITHMS)
@@ -136,11 +137,14 @@ class Worker(object):
         LOGGER.info(param_info)
 
         LOGGER.debug('Creating algorithm...')
+
+        # start the algorithm
         algorithm = self.db.start_algorithm(dataset_id=self.dataset.id,
                                             host=HOSTNAME,
                                             algorithm=algorithm.class_path,
                                             hyperparameter_values=params)
 
+        # transform the dataset and save the algorithm
         try:
             LOGGER.debug('Testing algorithm...')
             res = self.transform_dataset(algorithm.instance(params))
