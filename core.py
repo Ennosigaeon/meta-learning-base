@@ -7,11 +7,14 @@ executing and orchestrating the main Core functionalities.
 import logging
 import random
 import time
+from collections import defaultdict
 from operator import attrgetter
 
 import numpy as np
 from autosklearn.metalearning.metafeatures.metafeature import MetaFeature, HelperFunction
-from numpy.linalg import LinAlgError
+import scipy.stats
+from scipy.linalg import LinAlgError
+import scipy.sparse
 from pymfe.mfe import MFE
 
 from data import store_data, load_data
@@ -93,7 +96,7 @@ class Core(object):
         # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
         # ##########################################################################
-        # #  Extracting Meta Features from pymfe  ##################################
+        # #  Extracting Meta Features with pymfe  ##################################
         # ##########################################################################
 
         # Loading train_path
@@ -177,8 +180,7 @@ class Core(object):
             def _calculate(self, X, y, categorical):
                 missing = ~np.isfinite(X)
                 missing = missing.sum().sum()
-                return float(missing) / \
-                       float(X.shape[0] * X.shape[1])
+                return float(missing) / float(X.shape[0] * X.shape[1])
 
         class NumberOfInstancesWithMissingValues(MetaFeature):
             def _calculate(self, X, y, categorical):
@@ -192,39 +194,114 @@ class Core(object):
                 num_missing = missing.sum(axis=0)
                 return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
 
-        # TODO not working
-        class PCA(HelperFunction):
+        class ClassOccurrences(HelperFunction):
             def _calculate(self, X, y, categorical):
-                import sklearn.decomposition
-                pca = sklearn.decomposition.PCA(copy=True)
-                rs = np.random.RandomState(42)
-                indices = np.arange(X.shape[0])
-                for i in range(10):
-                    try:
-                        rs.shuffle(indices)
-                        pca.fit(X[indices])
-                        return pca
-                    except LinAlgError as e:
-                        pass
-                self.logger.warning("Failed to compute a Principle Component Analysis")
-                return None
+                if len(y.shape) == 2:
+                    occurrences = []
+                    for i in range(y.shape[1]):
+                        occurrences.append(self._calculate(X, y[:, i], categorical))
+                    return occurrences
+                else:
+                    occurrence_dict = defaultdict(float)
+                    for value in y:
+                        occurrence_dict[value] += 1
+                    return occurrence_dict
 
-        class PCAFractionOfComponentsFor95PercentVariance(MetaFeature):
+        # noinspection PyTypeChecker
+        occurrences = ClassOccurrences._calculate(self, X, y, categorical=True)
+        # noinspection PyTypeChecker
+        occurrence_dict = ClassOccurrences._calculate(self, X, y, categorical=True)
+
+        class ClassProbabilityMean(MetaFeature):
             def _calculate(self, X, y, categorical):
-                pca_ = PCA._calculate(self, X, y, categorical=True)
-                if pca_ is None:
-                    return np.NaN
-                sum_ = 0.
-                idx = 0
-                while sum_ < 0.95 and idx < len(pca_.explained_variance_ratio_):
-                    sum_ += pca_.explained_variance_ratio_[idx]
-                    idx += 1
-                return float(idx) / float(X.shape[1])
+                if len(y.shape) == 2:
+                    occurrences = []
+                    for i in range(y.shape[1]):
+                        occurrences.extend(
+                            [occurrence for occurrence in occurrence_dict[
+                                i].values()])
+                    occurrences = np.array(occurrences)
+                else:
+                    occurrences = np.array([occurrence for occurrence in occurrence_dict.values()],
+                                          dtype=np.float64)
+                return (occurrences / y.shape[0]).mean()
 
+        class ClassProbabilitySTD(MetaFeature):
+            def _calculate(self, X, y, categorical):
+                if len(y.shape) == 2:
+                    stds = []
+                    for i in range(y.shape[1]):
+                        std = np.array(
+                            [occurrence for occurrence in occurrence_dict[
+                                i].values()],
+                            dtype=np.float64)
+                        std = (std / y.shape[0]).std()
+                        stds.append(std)
+                    return np.mean(stds)
+                else:
+                    occurences = np.array([occurrence for occurrence in occurrence_dict.values()],
+                                          dtype=np.float64)
+                    return (occurences / y.shape[0]).std()
+
+        # TODO PCA not working yet
+        # class PCA(HelperFunction):
+        #     def _calculate(self, X, y, categorical):
+        #         import sklearn.decomposition
+        #         pca = sklearn.decomposition.PCA(copy=True)
+        #         rs = np.random.RandomState(42)
+        #         indices = np.arange(X.shape[0])
+        #         for i in range(10):
+        #             try:
+        #                 rs.shuffle(indices)
+        #                 pca.fit(X[indices])
+        #                 return pca
+        #             except LinAlgError as e:
+        #                 pass
+        #         self.logger.warning("Failed to compute a Principle Component Analysis")
+        #         return None
+        #
+        # # noinspection PyTypeChecker
+        # pca = PCA._calculate(self, X, y, categorical=True)
+        #
+        # class PCAFractionOfComponentsFor95PercentVariance(MetaFeature):
+        #     def _calculate(self, X, y, categorical):
+        #         pca_ = pca
+        #         if pca_ is None:
+        #             return np.NaN
+        #         sum_ = 0.
+        #         idx = 0
+        #         while sum_ < 0.95 and idx < len(pca_.explained_variance_ratio_):
+        #             sum_ += pca_.explained_variance_ratio_[idx]
+        #             idx += 1
+        #         return float(idx) / float(X.shape[1])
+        #
+        # class PCASkewnessFirstPC(MetaFeature):
+        #     def _calculate(self, X, y, categorical):
+        #         pca_ = pca
+        #         if pca_ is None:
+        #             return np.NaN
+        #         components = pca_.components_
+        #         pca_.components_ = components[:1]
+        #         transformed = pca_.transform(X)
+        #         pca_.components_ = components
+        #
+        #         skewness = scipy.stats.skew(transformed)
+        #         return skewness[0]
+
+        # noinspection PyTypeChecker
         nr_missing_values = NumberOfMissingValues._calculate(self, X, y, categorical=True)
+        # noinspection PyTypeChecker
         pct_missing_values = PercentageOfMissingValues._calculate(self, X, y, categorical=True)
+        # noinspection PyTypeChecker
         nr_inst_mv = NumberOfInstancesWithMissingValues._calculate(self, X, y, categorical=True)
+        pct_inst_mv = float(nr_inst_mv) / float(nr_inst)
+        # noinspection PyTypeChecker
         nr_attr_mv = NumberOfFeaturesWithMissingValues._calculate(self, X, y, categorical=True)
+        pct_attr_mv = float(nr_attr_mv) / float(nr_attr)
+        # noinspection PyTypeChecker
+        class_prob_mean = ClassProbabilityMean._calculate(self, X, y, categorical=True)
+        # noinspection PyTypeChecker
+        class_prob_std = ClassProbabilitySTD._calculate(self, X, y, categorical=True)
 
         return self.db.create_dataset(
             train_path=train_path,
@@ -238,7 +315,9 @@ class Core(object):
             nr_missing_values=nr_missing_values,
             pct_missing_values=pct_missing_values,
             nr_inst_mv=nr_inst_mv,
+            pct_inst_mv=pct_inst_mv,
             nr_attr_mv=nr_attr_mv,
+            pct_attr_mv=pct_attr_mv,
             nr_outliers=nr_outliers,
 
             skewness_mean=skewness_mean,
@@ -257,6 +336,8 @@ class Core(object):
             var_mean=var_mean,
             var_sd=var_sd,
 
+            class_prob_mean=class_prob_mean,
+            class_prob_std=class_prob_std,
             class_ent=class_ent,
             attr_ent_mean=attr_ent_mean,
             attr_ent_sd=attr_ent_sd,
@@ -285,7 +366,6 @@ class Core(object):
             linear_discr_sd=linear_discr_sd,
             naive_bayes_mean=naive_bayes_mean,
             naive_bayes_sd=naive_bayes_sd
-
         )
 
     def add_algorithm(self, ds_id: int, algorithm: str):

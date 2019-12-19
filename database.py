@@ -94,7 +94,9 @@ class Dataset(Base):
     nr_missing_values = Column(Numeric)
     pct_missing_values = Column(Numeric)
     nr_inst_mv = Column(Numeric)
+    pct_inst_mv = Column(Numeric)
     nr_attr_mv = Column(Numeric)
+    pct_attr_mv = Column(Numeric)
     nr_outliers = Column(Numeric)
 
     skewness_mean = Column(Numeric)
@@ -113,6 +115,8 @@ class Dataset(Base):
     var_mean = Column(Numeric)
     var_sd = Column(Numeric)
 
+    class_prob_mean = Column(Numeric)
+    class_prob_std = Column(Numeric)
     class_ent = Column(Numeric)
     attr_ent_mean = Column(Numeric)
     attr_ent_sd = Column(Numeric)
@@ -174,7 +178,8 @@ class Dataset(Base):
                  leaves_per_class_sd=None, var_importance_mean=None, var_importance_sd=None, one_nn_mean=None,
                  one_nn_sd=None, best_node_mean=None, best_node_sd=None, best_random=None, best_worst=None,
                  linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
-                 nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None):
+                 nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None, pct_inst_mv=None,
+                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None):
 
         self.train_path = train_path
         self.test_path = test_path
@@ -189,7 +194,9 @@ class Dataset(Base):
         self.nr_missing_values = nr_missing_values
         self.pct_missing_values = pct_missing_values
         self.nr_inst_mv = nr_inst_mv
+        self.pct_inst_mv = pct_inst_mv
         self.nr_attr_mv = nr_attr_mv
+        self.pct_attr_mv = pct_attr_mv
         self.nr_outliers = nr_outliers
 
         self.skewness_mean = skewness_mean
@@ -208,6 +215,8 @@ class Dataset(Base):
         self.var_mean = var_mean
         self.var_sd = var_sd
 
+        self.class_prob_mean = class_prob_mean
+        self.class_prob_std = class_prob_std
         self.class_ent = class_ent
         self.attr_ent_mean = attr_ent_mean
         self.attr_ent_sd = attr_ent_sd
