@@ -77,14 +77,17 @@ Base = declarative_base()
 class Dataset(Base):
     __tablename__ = 'datasets'
 
+    # columns necessary for loading/processing data
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     class_target = Column(String(100))
 
-    # columns necessary for loading/processing data
     train_path = Column(String, nullable=False)
     test_path = Column(String)
     reference_path = Column(String)
+    status = Column(String)
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
     processed = Column(Integer)
 
     # metadata columns
@@ -139,8 +142,8 @@ class Dataset(Base):
     one_nn_sd = Column(Numeric)
     best_node_mean = Column(Numeric)
     best_node_sd = Column(Numeric)
-    best_random = Column(Numeric)
-    best_worst = Column(Numeric)
+    # best_random = Column(Numeric)
+    # best_worst = Column(Numeric)
     linear_discr_mean = Column(Numeric)
     linear_discr_sd = Column(Numeric)
     naive_bayes_mean = Column(Numeric)
@@ -168,7 +171,8 @@ class Dataset(Base):
         md5 = hashlib.md5(path.encode('utf-8'))
         return md5.hexdigest()
 
-    def __init__(self, train_path, test_path=None, reference_path=None, status=None, name=None, id=None,
+    def __init__(self, train_path, test_path=None, reference_path=None, name=None, id=None, status=RunStatus.PENDING,
+                 start_time: datetime = None, end_time: datetime = None,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
                  attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
@@ -186,7 +190,9 @@ class Dataset(Base):
         self.reference_path = reference_path
         self.name = name or self._make_name(train_path)
         self.status = status
-        self.id = id
+        self.id: Optional[int] = id
+        self.start_time: Optional[datetime] = start_time
+        self.end_time: Optional[datetime] = end_time
 
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
@@ -448,12 +454,29 @@ class Database(object):
         """ Get a specific datarun. """
         return self.session.query(Dataset).get(dataset_id)
 
+    # TODO müssen False, False, True dastehen oder leer lassen weil gewünschter parameter bei work definiert wird?
     @try_with_session()
     def get_datasets(self, ignore_pending: bool = False, ignore_running: bool = False,
                      ignore_complete: bool = True) -> Optional[List[Dataset]]:
-        # TODO adapt
 
+        """
+        Get a list of all datasets matching the chosen filters.
+
+        Args:
+            ignore_pending: if True, ignore datasets that have not been started
+            ignore_running: if True, ignore datasets that are already running
+            ignore_complete: if True, ignore completed datasets
+        """
+
+        # TODO adapt || wenn dataset hinzugefügt wird -> mark pending -->> an welcher stelle?
         query = self.session.query(Dataset)
+        if ignore_pending:
+            query = query.filter(Dataset.status != RunStatus.PENDING)
+        if ignore_running:
+            query = query.filter(Dataset.status != RunStatus.RUNNING)
+        if ignore_complete:
+            query = query.filter(Dataset.status != RunStatus.COMPLETE)
+
         datasets = query.all()
 
         if not len(datasets):
@@ -461,35 +484,37 @@ class Database(object):
         return datasets
 
     @try_with_session()
-    def get_algorithms(self, ignore_pending=False, ignore_running=False,
-                       ignore_complete=True) -> Optional[List[Algorithm]]:
+    def get_algorithm(self, algorithm_id):
+        """ Get a specific algorithm. """
+        return self.session.query(Algorithm).get(algorithm_id)
+
+    @try_with_session()
+    def get_algorithms(self, ignore_errored: bool = False, ignore_running: bool = False,
+                       ignore_complete: bool = True) -> Optional[List[Algorithm]]:
+
         """
         Get a list of all datasets matching the chosen filters.
 
         Args:
-            ignore_pending: if True, ignore algorithms that have not been started
+            ignore_errored: if True, ignore algorithms that are errored
             ignore_running: if True, ignore algorithms that are already running
             ignore_complete: if True, ignore completed algorithms
         """
-        # TODO adapt
+
+        # TODO adapt || wenn algorithm hinzugefügt wird -> mark pending -->> an welcher stelle?
         query = self.session.query(Algorithm)
-        if ignore_pending:
-            query = query.filter(Algorithm.status != RunStatus.PENDING)
+        if ignore_errored:
+            query = query.filter(Algorithm.status != AlgorithmStatus.ERRORED)
         if ignore_running:
-            query = query.filter(Algorithm.status != RunStatus.RUNNING)
+            query = query.filter(Algorithm.status != AlgorithmStatus.RUNNING)
         if ignore_complete:
-            query = query.filter(Algorithm.status != RunStatus.COMPLETE)
+            query = query.filter(Algorithm.status != AlgorithmStatus.COMPLETE)
 
         algorithms = query.all()
 
         if not len(algorithms):
             return None
         return algorithms
-
-    @try_with_session()
-    def get_algorithm(self, algorithm_id):
-        """ Get a specific algorithm. """
-        return self.session.query(Algorithm).get(algorithm_id)
 
     # ##########################################################################
     # #  Methods to update the database  #######################################
@@ -549,21 +574,22 @@ class Database(object):
         algorithm.end_time = datetime.now()
 
     @try_with_session(commit=True)
+    def mark_dataset_running(self, dataset_id: int) -> None:
+        """
+        Set the status of the dataset to RUNNING and set the 'start_time' field
+        to the current datetime.
+        """
+        dataset = self.get_dataset(dataset_id)
+        dataset.status = RunStatus.RUNNING
+        dataset.start_time = datetime.now()
+
+    @try_with_session(commit=True)
     def mark_dataset_complete(self, dataset_id: int) -> None:
         """
-        Set the status of the Datarun to COMPLETE and set the 'end_time' field
+        Set the status of the dataset to COMPLETE and set the 'end_time' field
         to the current datetime.
         """
         dataset = self.get_dataset(dataset_id)
         dataset.status = RunStatus.COMPLETE
         dataset.end_time = datetime.now()
 
-    @try_with_session(commit=True)
-    def mark_dataset_running(self, dataset_id: int) -> None:
-        """
-        Set the status of the Datarun to COMPLETE and set the 'end_time' field
-        to the current datetime.
-        """
-        dataset = self.get_dataset(dataset_id)
-        dataset.status = RunStatus.RUNNING
-        dataset.end_time = datetime.now()
