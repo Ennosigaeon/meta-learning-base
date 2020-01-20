@@ -25,15 +25,20 @@ class Metafeatures(object):
         self.db = Database(dialect, database, username, password, host, port, query)
 
     def calculate_metafeatures(self, train_path, test_path=None, reference_path=None, name=None):
+
         # ##########################################################################
         # #  Extracting Meta Features with pymfe  ##################################
         # ##########################################################################
 
-        # Loading train_path
+        """
+        Loading train_path
+        """
         df = load_data(train_path)
         X, y = df.drop('class', axis=1), df['class']
 
-        # Selecting Meta Features and extracting them
+        """
+        Selecting Meta Features and extracting them
+        """
         mfe = MFE(
             features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
                        'attr_conc', 'sparsity', 'gravity', 'var', 'class_ent', 'attr_ent', 'mut_inf', 'eq_num_attr',
@@ -41,11 +46,14 @@ class Metafeatures(object):
                        'best_node', 'best_random', 'best_worst', 'linear_discr', 'naive_bayes', 'leaves_per_class']),
             random_state=42
         )
+
         # noinspection PyTypeChecker
         mfe.fit(X.values, y.values)
         ft = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
-        # Mapping values to Meta Feature variables
+        """
+        Mapping values to Meta Feature variables
+        """
         nr_inst = ft[1][30]
         nr_attr = ft[1][28]
         nr_class = ft[1][29]
@@ -239,7 +247,7 @@ class Metafeatures(object):
             test_path='test_path',
             reference_path='reference_path',
             name=name,
-            
+
             nr_inst=nr_inst,
             nr_attr=nr_attr,
             nr_class=nr_class,

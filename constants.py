@@ -6,6 +6,7 @@ from builtins import object
 # A bunch of constants which are used throughout the project, mostly for config.
 SQL_DIALECTS = ['sqlite', 'mysql', 'postgres']
 ALGORITHM_STATUS = ['running', 'errored', 'complete']
+RUN_STATUS = ['pending', 'running', 'complete']
 
 S3_PREFIX = '^s3://'
 HTTP_PREFIX = '^https?://'

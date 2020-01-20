@@ -7,22 +7,13 @@ executing and orchestrating the main Core functionalities.
 import logging
 import random
 import time
-from collections import defaultdict
 from operator import attrgetter
-from metafeatures import Metafeatures
 
-import numpy as np
-from autosklearn.metalearning.metafeatures.metafeature import MetaFeature, HelperFunction
-import scipy.stats
-from scipy.linalg import LinAlgError
-import scipy.sparse
-from pymfe.mfe import MFE
-
-from data import store_data, load_data
-from database import Database
 from tqdm import tqdm
 
 from constants import RunStatus
+from database import Database
+from metafeatures import Metafeatures
 from worker import AlgorithmError, Worker
 
 LOGGER = logging.getLogger(__name__)
@@ -94,6 +85,7 @@ class Core(object):
 
         # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
+        # TODO wenn oben Metafeatures() und hier self weg -> keine Daten in der DB Tabelle
         return self.metafeatures.calculate_metafeatures(self,
                                                         train_path=train_path,
                                                         test_path=test_path,
@@ -102,6 +94,13 @@ class Core(object):
                                                         )
 
     def add_algorithm(self, ds_id: int, algorithm: str):
+        """Add a new algorithm to the Database.
+        Args:
+
+        Returns:
+            Algorithm:
+                The created algorithm.
+        """
         return self.db.start_algorithm(
             dataset_id=ds_id,
             algorithm=algorithm
@@ -116,18 +115,23 @@ class Core(object):
                 Otherwise, work on them in sequential order (by ID).
                 Optional. Defaults to ``True``.
             wait (bool):
-                If ``True``, wait for more Dataruns to be inserted into the Database
+                If ``True``, wait for more datasets to be inserted into the Database
                 once all have been processed. Otherwise, exit the worker loop
                 when they ds out.
                 Optional. Defaults to ``False``.
             verbose (bool):
                 Whether to be verbose about the process. Optional. Defaults to ``True``.
         """
-        # main loop
+
+        # ##########################################################################
+        # #  Main Loop  ############################################################
+        # ##########################################################################
+
         while True:
-            # get all pending and running datasets, or all pending/running datasets
-            # from the list we were given
-            datasets = self.db.get_datasets(ignore_complete=True)
+            """
+            Get all pending and running datasets, or all pending/running datasets from the list we were given
+            """
+            datasets = self.db.get_datasets()
             if not datasets:
                 if wait:
                     LOGGER.debug('No datasets found. Sleeping %d seconds and trying again.',
@@ -139,32 +143,44 @@ class Core(object):
                     LOGGER.info('No datasets found. Exiting.')
                     break
 
-            # either choose a dataset randomly between priority, or take the dataset with the lowest ID
+            """
+            Either choose a dataset randomly between priority, or take the dataset with the lowest ID
+            """
             if choose_randomly:
                 ds = random.choice(datasets)
             else:
                 ds = sorted(datasets, key=attrgetter('id'))[0]
 
-            # if we haven't already started working on this dataset, mark it as started
+            """
+            Mark dataset as RUNNING
+            """
             # noinspection PyTypeChecker
             self.db.mark_dataset_running(ds.id)
 
-            LOGGER.info('Computing on datarun %d' % ds.id)
-            # actual work happens here
+            LOGGER.info('Computing on dataset {}'.format(ds.id))
+
+            """>> Actual work happens here <<
+            
+            Create instance of Worker
+            """
             worker = Worker(self.db, ds, s3_access_key=self.s3_access_key,
                             s3_secret_key=self.s3_secret_key, s3_bucket=self.s3_bucket, models_dir=self.models_dir,
                             metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
 
-            # progress bar
+            """
+            Progress bar
+            """
             try:
                 pbar = tqdm(
                     total=ds.budget,
                     ascii=True,
-                    initial=ds.completed_algorithm,
+                    initial=ds.processed,
                     disable=not verbose
                 )
 
-            # as long as there are datasets which aren't marked as completed yet -> run_algorithm
+                """
+                As long as there are datasets which aren't marked as completed yet -> run_algorithm
+                """
                 while ds.status != RunStatus.COMPLETE:
                     worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)
@@ -172,8 +188,11 @@ class Core(object):
                         pbar.update(ds.completed_algorithm - pbar.last_print_n)
 
                 pbar.close()
+
             except AlgorithmError:
-                # the exception has already been handled; just wait a sec so we
-                # don't go out of control reporting errors
+                """ 
+                The exception has already been handled; just wait a sec so we
+                don't go out of control reporting errors
+                """
                 LOGGER.error('Something went wrong. Sleeping %d seconds.', self._LOOP_WAIT)
                 time.sleep(self._LOOP_WAIT)

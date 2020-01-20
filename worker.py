@@ -4,11 +4,17 @@ import socket
 import traceback
 import warnings
 from builtins import object, str
+from datetime import datetime
 from typing import Union, Any, Optional
+import tempfile
 
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, ClassifierMixin, is_classifier, TransformerMixin
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 
-from database import Database
+from constants import AlgorithmStatus
+from data import load_data
+from database import Database, Algorithm
 from methods import ALGORITHMS
 from utilities import ensure_directory
 
@@ -49,8 +55,10 @@ class Worker(object):
         ensure_directory(self.models_dir)
         ensure_directory(self.metrics_dir)
 
-        # load the Dataset from the database
-        self.dataset = self.db.get_dataset(self.dataset.dataset_id)
+        """
+        Load the Dataset from the database
+        """
+        self.dataset = self.db.get_dataset(self.dataset.id)
 
     def transform_dataset(self, algorithm: BaseEstimator) -> Union[str, Any]:
         """
@@ -58,8 +66,11 @@ class Worker(object):
         algorithm model.
         Returns: Model object and metrics dictionary
         """
-
+        algorithm.fit_transform()
         train_path, test_path = self.dataset.load()
+
+        df = load_data(train_path)
+        X, y = df.drop('class', axis=1), df['class']
 
         # TODO Create algorithm instance from algorithm + params
         # If classifier:
@@ -68,6 +79,53 @@ class Worker(object):
         # If transformer:
         #   - Transform dataset
         #   - Store transformed dataset in tmp directory
+        #       --> newdataset = tempfile.TemporaryDirectory()/mkstmp()/mkdtmp()
+        """
+        algorithm kann also auch ein zufälliger Transformationsalgorithmus sein? Ebenfalls aus dem methods-Ordner?
+        
+        Classifier ja oder nein?
+        Wenn ja: Algorithmus auf Datenset anwenden und Score berechnen -> X, y Werte des Datensets dem Algorithmus
+        übergeben und durch Score-Methode Accuracy berechnet (?)
+        
+        Sonst Transformer: Transformer auf Datenset anwenden und anschließend das neue Datenset als neues Datenset
+        in tmp directory speichern.
+        Wenn der Tranformer keine Veränderung am Datenset vorgenommen hat (Imputation aber Datenset hatte keine
+        Missing Values) soll das Datenset den schlechtesten Accuracy Score bekommen und somit in save_algorithm nicht
+        (als neues Datenset) gespeichert werden.
+        
+        Return: Zurückgegeben als res, wird dann entweder der auf dem Datenset gelaufene Algorithmus und der berechnete
+        Score oder das transformierte Datenset. models_dir & metrics_dir
+        """
+        if is_classifier(algorithm):
+            X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+
+            algorithm.fit(X_train, y_train)
+
+            y_pred = algorithm.predict(X_test)
+
+            accuracy_score(y_test, y_pred)
+
+        else:
+            algorithm.fit_transform(X, y)
+            """Fit to data, then transform it.
+
+            Fits transformer to X and y with optional parameters fit_params
+            and returns a transformed version of X.
+
+            Parameters
+            ----------
+            X : numpy array of shape [n_samples, n_features]
+                Training set.
+
+            y : numpy array of shape [n_samples]
+                Target values.
+
+            Returns
+            -------
+            X_new : numpy array of shape [n_samples, n_features_new]
+                Transformed array.
+
+            """
 
         return ''
 
@@ -91,60 +149,106 @@ class Worker(object):
             pass
         else:
             # TODO store metrics
-            pass
+            accuracy = ''  # accuracy_score(y_test, y_pred)
+            average_precision = ''
+            f1_score = ''
+            precision = ''
+            recall = ''
+            neg_log_loss = ''
 
         # update the classifier in the database
-        self.db.complete_algorithm(algorithm_id=algorithm_id)
+        self.db.complete_algorithm(algorithm_id=algorithm_id,
+                                   accuracy=accuracy,
+                                   average_precision=average_precision,
+                                   f1_score=f1_score,
+                                   precision=precision,
+                                   recall=recall,
+                                   neg_log_loss=neg_log_loss)
 
-        LOGGER.info('Saved algorithm %d.' % algorithm_id)
+        LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
 
+    """
+    Check if dataset is finished
+    
+    First is_dataset_finished checks if there are algorithms for this dataset in the database marked as pending or
+    started. If there are none it returns False.
+    
+    Then is_dataset_finished checks if a dataset has enough budget for all the algorithms in the list.
+    If the dataset has run out of budget, is_data_set returns True.
+    """
     def is_dataset_finished(self):
-        algorithms = self.db.get_algorithms(dataset_id=self.dataset.id)
+        algorithms = self.db.get_algorithms(dataset_id=self.dataset.id, ignore_complete=False)
+        # No algorithms for this data set started yet
         if not algorithms:
-            LOGGER.warning('No incomplete algorithms for dataset %d present in database.'
-                           % self.dataset.id)
-            return True
+            return False
 
         n_completed = len(algorithms)
         if n_completed >= self.dataset.budget:
-            LOGGER.warning('Algorithm budget has run out!')
+            LOGGER.warning('Algorithm budget for dataset {} has run out!'.format(self.dataset))
             return True
 
         return False
 
     def run_algorithm(self):
-        # check to see if our work is done
+        """
+        Check to see if our work is done
+
+        First run_algorithm checks if is_dataset_finished returns True or False. If it returns True, the dataset is
+        marked as complete. If is_dataset_finished returns False, run_algorithm creates a new Algorithm instance with
+        a random Algorithm method. A random set of parameter configurations then is created for the Algorithms
+        hyperparameter and stored in the new Algorithm instance.
+
+        With the start_algorithm method, the new Algorithm instance then is stored in the database.
+
+        As a last step the methods run_algorithm calls the methods transform_dataset and save_algorithm.
+        """
         if self.is_dataset_finished():
-            # marked the run as done successfully
+            """
+            Mark the run as done successfully
+            """
             self.db.mark_dataset_complete(self.dataset.id)
-            LOGGER.warning('Dataset %d has ended.' % self.dataset.id)
+            LOGGER.warning('Dataset {} has been marked as complete.'.format(self.dataset))
             return
 
-        # choose a random algorithm to work on the dataset
+        """
+        Choose a random algorithm to work on the dataset
+        """
         try:
             LOGGER.debug('Choosing algorithm...')
-            algorithm = random.choice(ALGORITHMS)
+            algorithm = Algorithm(random.choice(ALGORITHMS),
+                                  dataset_id=self.dataset.id,
+                                  hyperparameter_values=None,
+                                  status=AlgorithmStatus.RUNNING,
+                                  start_time=datetime.now())
+
+            """Save a random configuration of the algorithms hyperparameters in params"""
             params = algorithm.random_config()
+            algorithm.hyperparameter_values = params
 
         except Exception:
-            LOGGER.error('Error choosing hyperparameters: datarun=%s' % str(self.dataset))
+            LOGGER.error('Error choosing hyperparameters: dataset={}'.format(self.dataset))
             LOGGER.error(traceback.format_exc())
             raise AlgorithmError()
 
-        param_info = 'Chose parameters for algorithm "%s":' % algorithm.class_path
+        param_info = 'Chose parameters for algorithm "{}":'.format(algorithm.class_path)
         for k in sorted(params.keys()):
-            param_info += '\n\t%s = %s' % (k, params[k])
+            param_info += '\n\t{} = {}'.format(k, params[k])
         LOGGER.info(param_info)
 
         LOGGER.debug('Creating algorithm...')
 
-        # start the algorithm
+        """
+        Start the algorithm (add it to database)
+        """
         algorithm = self.db.start_algorithm(dataset_id=self.dataset.id,
                                             host=HOSTNAME,
-                                            algorithm=algorithm.class_path,
-                                            hyperparameter_values=params)
+                                            algorithm=algorithm,
+                                            start_time=algorithm.start_time,
+                                            status=algorithm.status)
 
-        # transform the dataset and save the algorithm
+        """
+        Transform the dataset and save the algorithm
+        """
         try:
             LOGGER.debug('Testing algorithm...')
             res = self.transform_dataset(algorithm.instance(params))
@@ -154,7 +258,7 @@ class Worker(object):
 
         except Exception:
             msg = traceback.format_exc()
-            LOGGER.error('Error testing algorithm: datarun=%s' % str(self.dataset))
+            LOGGER.error('Error testing algorithm: dataset={}'.format(self.dataset))
             LOGGER.error(msg)
             self.db.mark_algorithm_errored(algorithm.id, error_message=msg)
             raise AlgorithmError()

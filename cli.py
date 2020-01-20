@@ -29,7 +29,7 @@ def _work(args, wait=False):
 
     core.work(
         choose_randomly=False,
-        save_files=args.save_files,
+        # save_files=args.save_files,
         wait=wait
     )
 
@@ -41,7 +41,7 @@ def _enter_data(args):
     dataset = core.add_dataset(**dataset_conf.to_dict())
 
     # TODO only temporary, remove again
-    algo = core.add_algorithm(dataset.id, 'random_forest')
+    # algo = core.add_algorithm(dataset.id, 'random_forest')
 
     return dataset.id
 
@@ -93,7 +93,7 @@ def _get_parser():
     worker = subparsers.add_parser('worker', parents=worker_parents,
                                    help='Start a single worker in foreground.')
     worker.set_defaults(action=_work)
-    worker.add_argument('--dataruns', help='Only train on dataruns with these ids', nargs='+')
+    worker.add_argument('--datasets', help='Only train on datasets with these ids', nargs='+')
     worker.add_argument('--total-time', help='Number of seconds to run worker', type=int)
 
     return parser

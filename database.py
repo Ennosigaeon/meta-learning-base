@@ -21,7 +21,7 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from constants import ALGORITHM_STATUS, AlgorithmStatus, RunStatus
+from constants import ALGORITHM_STATUS, AlgorithmStatus, RunStatus, RUN_STATUS
 from data import load_data
 from utilities import base_64_to_object, object_to_base_64
 
@@ -77,7 +77,9 @@ Base = declarative_base()
 class Dataset(Base):
     __tablename__ = 'datasets'
 
-    # columns necessary for loading/processing data
+    """
+    Columns necessary for loading/processing data
+    """
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     class_target = Column(String(100))
@@ -85,12 +87,15 @@ class Dataset(Base):
     train_path = Column(String, nullable=False)
     test_path = Column(String)
     reference_path = Column(String)
-    status = Column(String)
+    status = Column(Enum(*RUN_STATUS))
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     processed = Column(Integer)
+    budget = Column(Integer)
 
-    # metadata columns
+    """
+    Metadata columns
+    """
     nr_inst = Column(Numeric)
     nr_attr = Column(Numeric)
     nr_class = Column(Numeric)
@@ -172,7 +177,7 @@ class Dataset(Base):
         return md5.hexdigest()
 
     def __init__(self, train_path, test_path=None, reference_path=None, name=None, id=None, status=RunStatus.PENDING,
-                 start_time: datetime = None, end_time: datetime = None,
+                 start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 10,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
                  attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
@@ -193,6 +198,8 @@ class Dataset(Base):
         self.id: Optional[int] = id
         self.start_time: Optional[datetime] = start_time
         self.end_time: Optional[datetime] = end_time
+        self.processed: Optional[int] = processed
+        self.budget: Optional[int] = budget
 
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
@@ -253,39 +260,52 @@ class Dataset(Base):
         self.naive_bayes_sd = naive_bayes_sd
 
     def __repr__(self):
-        base = "<%s: %s, %d classes, %d features, %d rows>"
-        return base % (self.name, self.nr_class, self.nr_attr, self.nr_inst)
+        return "<{}: {} classes, {} features, {} rows>".format(self.name, self.nr_class, self.nr_attr, self.nr_inst)
 
 
 class Algorithm(Base):
     __tablename__ = 'algorithms'
 
-    # relational columns
+    """
+    Relational columns
+    """
     id = Column(Integer, primary_key=True, autoincrement=True)
     dataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
 
-    #
+    """
+    
+    """
     algorithm = Column(String(300), nullable=False)
+    status = Column(Enum(*ALGORITHM_STATUS))
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
+    error_message = Column(Text)
 
-    # hyperparameter
-    accuracy = Column(Integer)
-    average_precision = Column(Integer)
-    f1_score = Column(Integer)
-    precision = Column(Integer)
-    recall = Column(Integer)
-    neg_log_loss = Column(Integer)
+    """
+    Hyperparameter
+    """
     # base 64 encoding of the hyperparameter names and values
+    # TODO https://scikit-learn.org/stable/modules/model_evaluation.html
     hyperparameter_values_64 = Column(Text)
+    hyperparameter_values = Column(Text)
+    accuracy = Column(Numeric(precision=20, scale=10))
+    average_precision = Column(Numeric(precision=20, scale=10))
+    f1_score = Column(Numeric(precision=20, scale=10))
+    precision = Column(Numeric(precision=20, scale=10))
+    recall = Column(Numeric(precision=20, scale=10))
+    neg_log_loss = Column(Numeric(precision=20, scale=10))
 
-    # performance metrics
+    """
+    Performance metrics
+    """
     cv_judgment_metric = Column(Numeric(precision=20, scale=10))
     cv_judgment_metric_stdev = Column(Numeric(precision=20, scale=10))
     test_judgment_metric = Column(Numeric(precision=20, scale=10))
 
-    start_time = Column(DateTime)
-    end_time = Column(DateTime)
-    status = Column(Enum(*ALGORITHM_STATUS))
-    error_message = Column(Text)
+    """
+    Hostname
+    """
+    host = Column(String)
 
     @property
     def hyperparameter_values(self):
@@ -310,7 +330,9 @@ class Algorithm(Base):
                  status=None,
                  start_time: datetime = None,
                  end_time: datetime = None,
-                 error_message: str = None):
+                 error_message: str = None,
+                 hyperparameter_values=None,
+                 host=None):
 
         self.algorithm: str = algorithm
         self.status = status
@@ -319,6 +341,8 @@ class Algorithm(Base):
         self.start_time: Optional[datetime] = start_time
         self.end_time: Optional[datetime] = end_time
         self.error_message: Optional[str] = error_message
+        self.hyperparameter_values = hyperparameter_values
+        self.host = host
         self._load_cs()
 
     def _load_cs(self):
@@ -326,7 +350,7 @@ class Algorithm(Base):
         method: method code or path to JSON file containing all the information
             needed to specify this enumerator.
         """
-        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm) + '.json'
+        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm) # + '.json'
 
         with open(config_path) as f:
             config = json.load(f)
@@ -454,7 +478,6 @@ class Database(object):
         """ Get a specific datarun. """
         return self.session.query(Dataset).get(dataset_id)
 
-    # TODO müssen False, False, True dastehen oder leer lassen weil gewünschter parameter bei work definiert wird?
     @try_with_session()
     def get_datasets(self, ignore_pending: bool = False, ignore_running: bool = False,
                      ignore_complete: bool = True) -> Optional[List[Dataset]]:
@@ -468,7 +491,6 @@ class Database(object):
             ignore_complete: if True, ignore completed datasets
         """
 
-        # TODO adapt || wenn dataset hinzugefügt wird -> mark pending -->> an welcher stelle?
         query = self.session.query(Dataset)
         if ignore_pending:
             query = query.filter(Dataset.status != RunStatus.PENDING)
@@ -489,11 +511,11 @@ class Database(object):
         return self.session.query(Algorithm).get(algorithm_id)
 
     @try_with_session()
-    def get_algorithms(self, ignore_errored: bool = False, ignore_running: bool = False,
+    def get_algorithms(self, dataset_id: int = None, ignore_errored: bool = False, ignore_running: bool = False,
                        ignore_complete: bool = True) -> Optional[List[Algorithm]]:
 
         """
-        Get a list of all datasets matching the chosen filters.
+        Get a list of all algorithms matching the chosen filters.
 
         Args:
             ignore_errored: if True, ignore algorithms that are errored
@@ -501,8 +523,9 @@ class Database(object):
             ignore_complete: if True, ignore completed algorithms
         """
 
-        # TODO adapt || wenn algorithm hinzugefügt wird -> mark pending -->> an welcher stelle?
         query = self.session.query(Algorithm)
+        if dataset_id is not None:
+            query = query.filter(Algorithm.dataset_id == dataset_id)
         if ignore_errored:
             query = query.filter(Algorithm.status != AlgorithmStatus.ERRORED)
         if ignore_running:
@@ -529,17 +552,13 @@ class Database(object):
     @try_with_session(commit=True)
     def start_algorithm(self,
                         dataset_id: int,
-                        algorithm: str,
+                        algorithm: Algorithm, start_time, status, host,
                         hyperparameter_values: Dict = None) -> Algorithm:
         """
         Save a new, fully qualified algorithm object to the database.
         Returns: the ID of the newly-created algorithm
         """
-        # TODO adapt
-        algorithm = Algorithm(dataset_id=dataset_id,
-                              algorithm=algorithm,
-                              start_time=datetime.now(),
-                              status=AlgorithmStatus.RUNNING)
+
         self.session.add(algorithm)
         return algorithm
 
@@ -587,9 +606,10 @@ class Database(object):
     def mark_dataset_complete(self, dataset_id: int) -> None:
         """
         Set the status of the dataset to COMPLETE and set the 'end_time' field
-        to the current datetime.
+        to the current datetime. Count 'processed' up.
         """
         dataset = self.get_dataset(dataset_id)
         dataset.status = RunStatus.COMPLETE
         dataset.end_time = datetime.now()
-
+        # TODO ist richtig muss aber zu algorithm completed
+        dataset.processed += 1
