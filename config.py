@@ -135,8 +135,10 @@ class DatasetConfig(Config):
         'required': True
     }
     test_path = 'Path to raw test data (if applicable)'
-
-
+    class_column = {
+        'help': 'Column containing class labels',
+        'default': 'class'
+    }
 
 
 class SQLConfig(Config):
@@ -166,4 +168,11 @@ class LogConfig(Config):
         ),
         'action': 'store_true',
         'default': False
+    }
+
+
+class GenericConfig(Config):
+    data_dir = {
+        'help': 'Path to data location',
+        'default': '/vagrant/data/'  # C:\Users\usidflorsc\Documents\PycharmProjects\meta-learning-base\data
     }

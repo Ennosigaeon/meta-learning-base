@@ -5,6 +5,8 @@ import boto3
 import pandas as pd
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
+from config import GenericConfig
+import argparse
 from typing import Tuple
 
 LOGGER = logging.getLogger('mlb')
@@ -57,7 +59,15 @@ def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
     return pd.read_csv(path)
 
 
-def store_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,
+def store_data(df: pd.DataFrame, train_path) -> str:
+
+    # TODO
+    export_csv = df.to_csv(path_or_buf=train_path, header=False, index=False)
+
+    return export_csv
+
+
+def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,
                name: str = None) -> Tuple[str, str]:
     client: BaseClient = boto3.client(
         's3',

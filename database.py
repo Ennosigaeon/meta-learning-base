@@ -82,7 +82,7 @@ class Dataset(Base):
     """
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
-    class_target = Column(String(100))
+    class_column = Column(String(100))
 
     train_path = Column(String, nullable=False)
     test_path = Column(String)
@@ -156,7 +156,7 @@ class Dataset(Base):
 
     def load(self, test_size=0.3, random_state=0,
              aws_access_key=None, aws_secret_key=None):
-        data = load_data(self.name, self.train_path, aws_access_key, aws_secret_key)
+        data = load_data(self.train_path, aws_access_key, aws_secret_key, self.name)
 
         if self.test_path:
             if self.name.endswith('.csv'):
@@ -188,7 +188,7 @@ class Dataset(Base):
                  one_nn_sd=None, best_node_mean=None, best_node_sd=None, best_random=None, best_worst=None,
                  linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
                  nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None, pct_inst_mv=None,
-                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None):
+                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None):
 
         self.train_path = train_path
         self.test_path = test_path
@@ -200,6 +200,7 @@ class Dataset(Base):
         self.end_time: Optional[datetime] = end_time
         self.processed: Optional[int] = processed
         self.budget: Optional[int] = budget
+        self.class_column = class_column
 
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
@@ -285,7 +286,6 @@ class Algorithm(Base):
     Hyperparameter
     """
     # base 64 encoding of the hyperparameter names and values
-    # TODO https://scikit-learn.org/stable/modules/model_evaluation.html
     hyperparameter_values_64 = Column(Text)
     hyperparameter_values = Column(Text)
     accuracy = Column(Numeric(precision=20, scale=10))
@@ -294,6 +294,7 @@ class Algorithm(Base):
     precision = Column(Numeric(precision=20, scale=10))
     recall = Column(Numeric(precision=20, scale=10))
     neg_log_loss = Column(Numeric(precision=20, scale=10))
+    roc_auc_score = Column(Numeric(precision=20, scale=10))
 
     """
     Performance metrics
@@ -563,7 +564,8 @@ class Database(object):
         return algorithm
 
     @try_with_session(commit=True)
-    def complete_algorithm(self, algorithm_id, accuracy, average_precision, f1_score, precision, recall, neg_log_loss):
+    def complete_algorithm(self, algorithm_id, accuracy: float = None, av_precision: float = None, f1: float = None,
+                           precision: float = None, recall: float = None, neg_log_loss: float = None, roc_auc: float = None):
         """
         Set all the parameters on a algorithm that haven't yet been set, and mark
         it as complete.
@@ -572,11 +574,12 @@ class Database(object):
         algorithm = self.session.query(Algorithm).get(algorithm_id)
 
         algorithm.accuracy = accuracy
-        algorithm.average_precision = average_precision
-        algorithm.f1_score = f1_score
+        algorithm.average_precision = av_precision
+        algorithm.f1_score = f1
         algorithm.precision = precision
         algorithm.recall = recall
         algorithm.neg_log_loss = neg_log_loss
+        algorithm.roc_auc_score = roc_auc
         algorithm.end_time = datetime.now()
         algorithm.status = AlgorithmStatus.COMPLETE
 

@@ -1,30 +1,14 @@
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 from autosklearn.metalearning.metafeatures.metafeature import MetaFeature
 from pymfe.mfe import MFE
-
-from data import load_data
-from database import Database
 
 
 class Metafeatures(object):
 
-    def __init__(
-            self,
-
-            # SQL Conf
-            dialect: str = 'sqlite',
-            database: str = 'assets/ml-base.db',
-            username: str = None,
-            password: str = None,
-            host=None,
-            port=None,
-            query=None,
-    ):
-        self.db = Database(dialect, database, username, password, host, port, query)
-
-    def calculate_metafeatures(self, train_path, test_path=None, reference_path=None, name=None):
+    def calculate_metafeatures(self, df: pd.DataFrame, class_column: str = None):
 
         # ##########################################################################
         # #  Extracting Meta Features with pymfe  ##################################
@@ -33,8 +17,7 @@ class Metafeatures(object):
         """
         Loading train_path
         """
-        df = load_data(train_path)
-        X, y = df.drop('class', axis=1), df['class']
+        X, y = df.drop('class', axis=1), df[class_column]
 
         """
         Selecting Meta Features and extracting them
@@ -241,68 +224,62 @@ class Metafeatures(object):
         # noinspection PyTypeChecker
         # pca_skewness = PCASkewnessFirstPC._calculate(self, X, y, categorical=True)
 
-        return self.db.create_dataset(
+        return {
+            'nr_inst': nr_inst,
+            'nr_attr': nr_attr,
+            'nr_class': nr_class,
+            'nr_missing_values': nr_missing_values,
+            'pct_missing_values': pct_missing_values,
+            'nr_inst_mv': nr_inst_mv,
+            'pct_inst_mv': pct_inst_mv,
+            'nr_attr_mv': nr_attr_mv,
+            'pct_attr_mv': pct_attr_mv,
+            'nr_outliers': nr_outliers,
 
-            train_path=train_path,
-            test_path='test_path',
-            reference_path='reference_path',
-            name=name,
+            'skewness_mean': skewness_mean,
+            'skewness_sd': skewness_sd,
+            'kurtosis_mean': kurtosis_mean,
+            'kurtosis_sd': kurtosis_sd,
+            'cor_mean': cor_mean,
+            'cor_sd': cor_sd,
+            'cov_mean': cov_mean,
+            'cov_sd': cov_sd,
+            'attr_conc_mean': attr_conc_mean,
+            'attr_conc_sd': attr_conc_sd,
+            'sparsity_mean': sparsity_mean,
+            'sparsity_sd': sparsity_sd,
+            'gravity': gravity,
+            'var_mean': var_mean,
+            'var_sd': var_sd,
 
-            nr_inst=nr_inst,
-            nr_attr=nr_attr,
-            nr_class=nr_class,
-            nr_missing_values=nr_missing_values,
-            pct_missing_values=pct_missing_values,
-            nr_inst_mv=nr_inst_mv,
-            pct_inst_mv=pct_inst_mv,
-            nr_attr_mv=nr_attr_mv,
-            pct_attr_mv=pct_attr_mv,
-            nr_outliers=nr_outliers,
+            'class_prob_mean': class_prob_mean,
+            'class_prob_std': class_prob_std,
+            'class_ent': class_ent,
+            'attr_ent_mean': attr_ent_mean,
+            'attr_ent_sd': attr_ent_sd,
+            'mut_inf_mean': mut_inf_mean,
+            'mut_inf_sd': mut_inf_sd,
+            'eq_num_attr': eq_num_attr,
+            'ns_ratio': ns_ratio,
 
-            skewness_mean=skewness_mean,
-            skewness_sd=skewness_sd,
-            kurtosis_mean=kurtosis_mean,
-            kurtosis_sd=kurtosis_sd,
-            cor_mean=cor_mean,
-            cor_sd=cor_sd,
-            cov_mean=cov_mean,
-            cov_sd=cov_sd,
-            attr_conc_mean=attr_conc_mean,
-            attr_conc_sd=attr_conc_sd,
-            sparsity_mean=sparsity_mean,
-            sparsity_sd=sparsity_sd,
-            gravity=gravity,
-            var_mean=var_mean,
-            var_sd=var_sd,
+            'nodes': nodes,
+            'leaves': leaves,
+            'leaves_branch_mean': leaves_branch_mean,
+            'leaves_branch_sd': leaves_branch_sd,
+            'nodes_per_attr': nodes_per_attr,
+            'leaves_per_class_mean': leaves_per_class_mean,
+            'leaves_per_class_sd': leaves_per_class_sd,
+            'var_importance_mean': var_importance_mean,
+            'var_importance_sd': var_importance_sd,
 
-            class_prob_mean=class_prob_mean,
-            class_prob_std=class_prob_std,
-            class_ent=class_ent,
-            attr_ent_mean=attr_ent_mean,
-            attr_ent_sd=attr_ent_sd,
-            mut_inf_mean=mut_inf_mean,
-            mut_inf_sd=mut_inf_sd,
-            eq_num_attr=eq_num_attr,
-            ns_ratio=ns_ratio,
-
-            nodes=nodes,
-            leaves=leaves,
-            leaves_branch_mean=leaves_branch_mean,
-            leaves_branch_sd=leaves_branch_sd,
-            nodes_per_attr=nodes_per_attr,
-            leaves_per_class_mean=leaves_per_class_mean,
-            leaves_per_class_sd=leaves_per_class_sd,
-            var_importance_mean=var_importance_mean,
-            var_importance_sd=var_importance_sd,
-
-            one_nn_mean=one_nn_mean,
-            one_nn_sd=one_nn_sd,
-            best_node_mean=best_node_mean,
-            best_node_sd=best_node_sd,
-            # best_random=best_random,
-            # best_worst=best_worst,
-            linear_discr_mean=linear_discr_mean,
-            linear_discr_sd=linear_discr_sd,
-            naive_bayes_mean=naive_bayes_mean,
-            naive_bayes_sd=naive_bayes_sd
-        )
+            'one_nn_mean': one_nn_mean,
+            'one_nn_sd': one_nn_sd,
+            'best_node_mean': best_node_mean,
+            'best_node_sd': best_node_sd,
+            # best_random:best_random,
+            # best_worst:best_worst,
+            'linear_discr_mean': linear_discr_mean,
+            'linear_discr_sd': linear_discr_sd,
+            'naive_bayes_mean': naive_bayes_mean,
+            'naive_bayes_sd': naive_bayes_sd
+        }

@@ -5,7 +5,9 @@ import logging
 
 from core import Core
 
-from config import S3Config, DatasetConfig, LogConfig, SQLConfig
+from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig
+from data import load_data
+from database import Database
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,10 +40,10 @@ def _enter_data(args):
     core = _get_core(args)
     dataset_conf = DatasetConfig(args)
 
-    dataset = core.add_dataset(**dataset_conf.to_dict())
+    df = load_data(dataset_conf.train_path)
+    class_column = dataset_conf.class_column
 
-    # TODO only temporary, remove again
-    # algo = core.add_algorithm(dataset.id, 'random_forest')
+    dataset = core.add_dataset(df, class_column)
 
     return dataset.id
 

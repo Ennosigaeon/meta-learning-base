@@ -5,11 +5,13 @@ import traceback
 import warnings
 from builtins import object, str
 from datetime import datetime
-from typing import Union, Any, Optional
-import tempfile
+from typing import Optional, Tuple, Dict
+import numpy as np
+import pandas as pd
+from autosklearn.metrics import average_precision
 
-from sklearn.base import BaseEstimator, ClassifierMixin, is_classifier, TransformerMixin
-from sklearn.metrics import accuracy_score
+from sklearn.base import BaseEstimator, is_classifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, log_loss, roc_auc_score
 from sklearn.model_selection import train_test_split
 
 from constants import AlgorithmStatus
@@ -60,13 +62,13 @@ class Worker(object):
         """
         self.dataset = self.db.get_dataset(self.dataset.id)
 
-    def transform_dataset(self, algorithm: BaseEstimator) -> Union[str, Any]:
+    def transform_dataset(self, algorithm: BaseEstimator) -> Tuple[pd.DataFrame, Dict[str, float]]:
         """
         Given a set of fully-qualified hyperparameters, create and test a
         algorithm model.
         Returns: Model object and metrics dictionary
         """
-        algorithm.fit_transform()
+
         train_path, test_path = self.dataset.load()
 
         df = load_data(train_path)
@@ -79,7 +81,7 @@ class Worker(object):
         # If transformer:
         #   - Transform dataset
         #   - Store transformed dataset in tmp directory
-        #       --> newdataset = tempfile.TemporaryDirectory()/mkstmp()/mkdtmp()
+
         """
         algorithm kann also auch ein zufälliger Transformationsalgorithmus sein? Ebenfalls aus dem methods-Ordner?
         
@@ -103,33 +105,27 @@ class Worker(object):
 
             y_pred = algorithm.predict(X_test)
 
-            accuracy_score(y_test, y_pred)
+            accuracy = accuracy_score(y_test, y_pred)
+            precision = precision_score(y_test, y_pred)
+            av_precision = average_precision(y_test, y_pred)
+            recall = recall_score(y_test, y_pred)
+            f1 = f1_score(y_test, y_pred)
+            neg_log_loss = log_loss(y_test, y_pred)
+            roc_auc = roc_auc_score(y_test, y_pred)
 
+            return X, {'accuracy': accuracy,
+                       'precision': precision,
+                       'av_precision': av_precision,
+                       'recall': recall,
+                       'f1': f1,
+                       'neg_log_loss': neg_log_loss,
+                       'roc_auc': roc_auc
+                       }
         else:
-            algorithm.fit_transform(X, y)
-            """Fit to data, then transform it.
+            X = algorithm.fit_transform(X, y)
+            return X, {}
 
-            Fits transformer to X and y with optional parameters fit_params
-            and returns a transformed version of X.
-
-            Parameters
-            ----------
-            X : numpy array of shape [n_samples, n_features]
-                Training set.
-
-            y : numpy array of shape [n_samples]
-                Target values.
-
-            Returns
-            -------
-            X_new : numpy array of shape [n_samples, n_features_new]
-                Transformed array.
-
-            """
-
-        return ''
-
-    def save_algorithm(self, algorithm_id: Optional[int], res: Union[str, Any]) -> None:
+    def save_algorithm(self, algorithm_id: Optional[int], res: Tuple[pd.DataFrame, Dict[str, float]]) -> None:
         """
         Update a algorithm with metrics and model information and mark it as
         "complete"
@@ -144,26 +140,11 @@ class Worker(object):
         """
 
         # TODO store algorithm with either metrics or new transformed dataset in database
-        if isinstance(res, str):
-            # TODO add new dataset
-            pass
-        else:
-            # TODO store metrics
-            accuracy = ''  # accuracy_score(y_test, y_pred)
-            average_precision = ''
-            f1_score = ''
-            precision = ''
-            recall = ''
-            neg_log_loss = ''
 
-        # update the classifier in the database
-        self.db.complete_algorithm(algorithm_id=algorithm_id,
-                                   accuracy=accuracy,
-                                   average_precision=average_precision,
-                                   f1_score=f1_score,
-                                   precision=precision,
-                                   recall=recall,
-                                   neg_log_loss=neg_log_loss)
+        self.db.complete_algorithm(algorithm_id=algorithm_id, **res[1])
+
+        # Add new dataset entry to db
+        # store dataframe on disk with uuid name
 
         LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
 

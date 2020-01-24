@@ -5,16 +5,21 @@ executing and orchestrating the main Core functionalities.
 """
 
 import logging
+import os
 import random
 import time
+import uuid
 from operator import attrgetter
 
 from tqdm import tqdm
 
+from config import GenericConfig
 from constants import RunStatus
+from data import store_data
 from database import Database
 from metafeatures import Metafeatures
 from worker import AlgorithmError, Worker
+import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +50,7 @@ class Core(object):
             metrics_dir: str = 'metrics',
             verbose_metrics: bool = False,
     ):
-        self.metafeatures = Metafeatures
+        self.metafeatures = Metafeatures()
         self.db = Database(dialect, database, username, password, host, port, query)
         self.s3_endpoint: str = endpoint
         self.s3_bucket: str = bucket
@@ -56,46 +61,56 @@ class Core(object):
         self.metrics_dir: str = metrics_dir
         self.verbose_metrics: bool = verbose_metrics
 
-    def add_dataset(self, train_path, test_path=None, reference_path=None, name=None):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, name=None):
         """Add a new dataset to the Database.
         Args:
-            train_path (str):
-                Path to the training CSV file. It can be a local filesystem path,
-                absolute or relative, or an HTTP or HTTPS URL, or an S3 path in the
-                format ``s3://{bucket_name}/{key}``. Required.
-            test_path (str):
-                Path to the testing CSV file. It can be a local filesystem path,
-                absolute or relative, or an HTTP or HTTPS URL, or an S3 path in the
-                format ``s3://{bucket_name}/{key}``.
-                Optional. If not given, the training CSV will be split in two parts,
-                train and test.
-            reference_path (str):
-                Path to the referring dataset CSV file. It can be a local filesystem path,
-                absolute or relative, or an HTTP or HTTPS URL, or an S3 path in the
-                format ``s3://{bucket_name}/{key}``.
-                Optional.
+            df (DataFrame):
+
+            class_column (str):
+
             name (str):
                 Name given to this dataset. Optional. If not given, a hash will be
                 generated from the training_path and used as the Dataset name.
 
-        Returns:
-            Dataset:
-                The created dataset.
         """
+        # TODO
+        # 1. Train Path berechnen
+        rn_uuid = uuid.uuid4()
+        # --> berechnet zufällige uuid und speichert sie in rn_uuid
+        name = str(rn_uuid)  # .replace("-", "")
+        # --> wandelt rn_uuid in str um
+        data_path = GenericConfig.data_dir.get("default", "")
+        # --> speichert pfad von data_dir in variable data_path
+        train_path = os.path.join(data_path, name + '.csv')
+        # --> generiert train_path aus data_path und der in name gespeicherten uuid
+
+        # 2. Speichern vom DataFrame in [...]/data/
+        store_data(df, train_path)
 
         # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
-        # TODO wenn oben Metafeatures() und hier self weg -> keine Daten in der DB Tabelle
-        return self.metafeatures.calculate_metafeatures(self,
-                                                        train_path=train_path,
-                                                        test_path=test_path,
-                                                        reference_path=reference_path,
-                                                        name=name
-                                                        )
+        # 3. Metafeatures berechnen
+        mf = self.metafeatures.calculate_metafeatures(df=df,
+                                                      class_column=class_column
+                                                      )
+
+        # 4. Speichern in Datenbank
+        return self.db.create_dataset(
+            train_path=train_path,
+            test_path='test_path',
+            reference_path='reference_path',
+            name=name,
+            class_column=class_column,
+            **mf
+        )
 
     def add_algorithm(self, ds_id: int, algorithm: str):
         """Add a new algorithm to the Database.
         Args:
+            ds_id:
+
+            algorithm:
+
 
         Returns:
             Algorithm:
