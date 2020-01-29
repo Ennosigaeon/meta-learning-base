@@ -3,11 +3,9 @@
 import argparse
 import logging
 
+from config import S3Config, DatasetConfig, LogConfig, SQLConfig
 from core import Core
-
-from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig
 from data import load_data
-from database import Database
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ def _enter_data(args):
     df = load_data(dataset_conf.train_path)
     class_column = dataset_conf.class_column
 
-    dataset = core.add_dataset(df, class_column)
+    dataset = core.add_dataset(df, class_column, 0)
 
     return dataset.id
 

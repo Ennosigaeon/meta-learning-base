@@ -17,7 +17,7 @@ class Metafeatures(object):
         """
         Loading train_path
         """
-        X, y = df.drop('class', axis=1), df[class_column]
+        X, y = df.drop(class_column, axis=1), df[class_column]
 
         """
         Selecting Meta Features and extracting them

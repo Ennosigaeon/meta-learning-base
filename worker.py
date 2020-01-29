@@ -5,20 +5,22 @@ import traceback
 import warnings
 from builtins import object, str
 from datetime import datetime
-from typing import Optional, Tuple, Dict
-import numpy as np
+from typing import Optional, Tuple, Dict, TYPE_CHECKING
+
 import pandas as pd
 from autosklearn.metrics import average_precision
-
 from sklearn.base import BaseEstimator, is_classifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, log_loss, roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, log_loss, roc_auc_score, \
+    precision_recall_fscore_support
+from sklearn.model_selection import train_test_split, cross_validate, cross_val_predict
 
 from constants import AlgorithmStatus
-from data import load_data
 from database import Database, Algorithm
 from methods import ALGORITHMS
-from utilities import ensure_directory
+from utilities import ensure_directory, multiclass_roc_auc_score
+
+if TYPE_CHECKING:
+    from core import Core
 
 warnings.filterwarnings('ignore')
 
@@ -35,6 +37,7 @@ class Worker(object):
     def __init__(self,
                  database: Database,
                  dataset,
+                 core,
                  cloud_mode: bool = False,
                  s3_access_key: str = None,
                  s3_secret_key: str = None,
@@ -45,6 +48,7 @@ class Worker(object):
 
         self.db = database
         self.dataset = dataset
+        self.core: Core = core
         self.cloud_mode = cloud_mode
 
         self.s3_access_key = s3_access_key
@@ -69,59 +73,52 @@ class Worker(object):
         Returns: Model object and metrics dictionary
         """
 
-        train_path, test_path = self.dataset.load()
+        """Load input dataset and class_column"""
+        df = self.dataset.load()
+        class_column = self.dataset.class_column
 
-        df = load_data(train_path)
-        X, y = df.drop('class', axis=1), df['class']
-
-        # TODO Create algorithm instance from algorithm + params
-        # If classifier:
-        #   - Cross-Validation to fit model
-        #   - Calculate averaged metrics
-        # If transformer:
-        #   - Transform dataset
-        #   - Store transformed dataset in tmp directory
+        """Split input dataset in X and y"""
+        X, y = df.drop(class_column, axis=1), df[class_column]
 
         """
-        algorithm kann also auch ein zufälliger Transformationsalgorithmus sein? Ebenfalls aus dem methods-Ordner?
+        Checks if algorithm (BaseEstimator) is a classifier. 
         
-        Classifier ja oder nein?
-        Wenn ja: Algorithmus auf Datenset anwenden und Score berechnen -> X, y Werte des Datensets dem Algorithmus
-        übergeben und durch Score-Methode Accuracy berechnet (?)
+        If True, split X, y in train & test data, fit the algorithm model and call predict. Then calculate the
+        evaluation metrics for the algorithm model and return them as a dict.
         
-        Sonst Transformer: Transformer auf Datenset anwenden und anschließend das neue Datenset als neues Datenset
-        in tmp directory speichern.
-        Wenn der Tranformer keine Veränderung am Datenset vorgenommen hat (Imputation aber Datenset hatte keine
-        Missing Values) soll das Datenset den schlechtesten Accuracy Score bekommen und somit in save_algorithm nicht
-        (als neues Datenset) gespeichert werden.
-        
-        Return: Zurückgegeben als res, wird dann entweder der auf dem Datenset gelaufene Algorithmus und der berechnete
-        Score oder das transformierte Datenset. models_dir & metrics_dir
+        If False, call fit_transform on X, y and return the transformed dataset as Dataframe.
         """
+
         if is_classifier(algorithm):
-            X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+            """Predict labels with 5 fold cross validation"""
+            y_pred = cross_val_predict(algorithm, X, y, cv=5)
 
-            algorithm.fit(X_train, y_train)
+            # switch/if else ob multiclass oder nicht
+            # --> multiclass
+            accuracy = accuracy_score(y, y_pred)
+            precision = precision_score(y, y_pred, average='macro')
+            # av_precision = average_precision(y, y_pred)
+            recall = recall_score(y, y_pred, average='macro')
+            f1 = f1_score(y, y_pred, average='macro')
+            # neg_log_loss = log_loss(y, y_pred)  # ValueError: could not convert string to float: 'Iris-setosa'
+            roc_auc = multiclass_roc_auc_score(y, y_pred, average='macro')
 
-            y_pred = algorithm.predict(X_test)
+            # --> not multiclass
 
-            accuracy = accuracy_score(y_test, y_pred)
-            precision = precision_score(y_test, y_pred)
-            av_precision = average_precision(y_test, y_pred)
-            recall = recall_score(y_test, y_pred)
-            f1 = f1_score(y_test, y_pred)
-            neg_log_loss = log_loss(y_test, y_pred)
-            roc_auc = roc_auc_score(y_test, y_pred)
+            """Convert np array y_pred to pd series and add it to X"""
+            y_pred = pd.Series(y_pred)
+            X = pd.concat([X, y_pred], axis=1)
 
             return X, {'accuracy': accuracy,
                        'precision': precision,
-                       'av_precision': av_precision,
+                       # 'av_precision': av_precision,
                        'recall': recall,
                        'f1': f1,
-                       'neg_log_loss': neg_log_loss,
+                       # 'neg_log_loss': neg_log_loss,
                        'roc_auc': roc_auc
                        }
         else:
+            """Call fit_transform on X, y and safe the transformed dataset in X"""
             X = algorithm.fit_transform(X, y)
             return X, {}
 
@@ -138,15 +135,29 @@ class Worker(object):
         metrics: Dictionary containing cross-validation and test metrics data
             for the model.
         """
+        """Load input dataset and class_column. Drop class_column from input dataset."""
+        dataset = self.dataset.load()
+        class_column = self.dataset.class_column
+        dataset, dataset_class_column = dataset.drop(class_column, axis=1), dataset[class_column]
 
-        # TODO store algorithm with either metrics or new transformed dataset in database
-
-        self.db.complete_algorithm(algorithm_id=algorithm_id, **res[1])
-
-        # Add new dataset entry to db
-        # store dataframe on disk with uuid name
-
+        """Call complete_algorithm to save the algorithm to the database."""
+        self.db.complete_algorithm(algorithm_id=algorithm_id, dataset=self.dataset, **res[1])
         LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
+
+        """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
+        if res[0].equals(dataset):
+            LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
+                        .format(self.dataset.id))
+
+        else:
+            """Load class_column and join transformed dataset with removed class_column of the input dataset.
+            Add transformed dataset to DB"""
+            class_column = self.dataset.class_column
+            new_dataset = pd.concat([res[0], dataset_class_column], axis=1)
+            depth = self.dataset.depth  # unsupported operand type(s) for +: 'NoneType' and 'int'
+            depth += 1
+            self.core.add_dataset(new_dataset, class_column, depth=depth)
+            LOGGER.info('Transformed dataset will be stored in DB.')
 
     """
     Check if dataset is finished
@@ -166,6 +177,10 @@ class Worker(object):
         n_completed = len(algorithms)
         if n_completed >= self.dataset.budget:
             LOGGER.warning('Algorithm budget for dataset {} has run out!'.format(self.dataset))
+            return True
+
+        if self.dataset.depth >= 5:
+            LOGGER.warning('Dataset {} has reached max depth!'.format(self.dataset))
             return True
 
         return False

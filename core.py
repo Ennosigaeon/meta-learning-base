@@ -61,7 +61,7 @@ class Core(object):
         self.metrics_dir: str = metrics_dir
         self.verbose_metrics: bool = verbose_metrics
 
-    def add_dataset(self, df: pd.DataFrame, class_column: str, name=None):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, depth, name=None):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
@@ -72,13 +72,19 @@ class Core(object):
                 Name given to this dataset. Optional. If not given, a hash will be
                 generated from the training_path and used as the Dataset name.
 
+            depth (int):
+
         """
-        # TODO
-        # 1. Train Path berechnen
-        rn_uuid = uuid.uuid4()
-        # --> berechnet zufällige uuid und speichert sie in rn_uuid
-        name = str(rn_uuid)  # .replace("-", "")
-        # --> wandelt rn_uuid in str um
+
+        if not name:
+            # 1. Train Path berechnen
+            rn_uuid = uuid.uuid4()
+            # --> berechnet zufällige uuid und speichert sie in rn_uuid
+            name = str(rn_uuid)  # .replace("-", "")
+            # --> wandelt rn_uuid in str um
+        else:
+            return name
+
         data_path = GenericConfig.data_dir.get("default", "")
         # --> speichert pfad von data_dir in variable data_path
         train_path = os.path.join(data_path, name + '.csv')
@@ -97,10 +103,9 @@ class Core(object):
         # 4. Speichern in Datenbank
         return self.db.create_dataset(
             train_path=train_path,
-            test_path='test_path',
-            reference_path='reference_path',
             name=name,
             class_column=class_column,
+            depth=depth,
             **mf
         )
 
@@ -178,7 +183,7 @@ class Core(object):
             
             Create instance of Worker
             """
-            worker = Worker(self.db, ds, s3_access_key=self.s3_access_key,
+            worker = Worker(self.db, ds, self, s3_access_key=self.s3_access_key,
                             s3_secret_key=self.s3_secret_key, s3_bucket=self.s3_bucket, models_dir=self.models_dir,
                             metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
 

@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 import numpy as np
 import pymysql
 from ConfigSpace.conditions import InCondition
-from ConfigSpace.configuration_space import ConfigurationSpace
+from ConfigSpace.configuration_space import ConfigurationSpace, Configuration
 from ConfigSpace.hyperparameters import UniformIntegerHyperparameter, UniformFloatHyperparameter, \
     CategoricalHyperparameter
 from sklearn.base import BaseEstimator
@@ -86,12 +86,13 @@ class Dataset(Base):
 
     train_path = Column(String, nullable=False)
     test_path = Column(String)
-    reference_path = Column(String)
+    # reference_path = Column(String)
     status = Column(Enum(*RUN_STATUS))
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     processed = Column(Integer)
     budget = Column(Integer)
+    depth = Column(Integer)
 
     """
     Metadata columns
@@ -158,18 +159,18 @@ class Dataset(Base):
              aws_access_key=None, aws_secret_key=None):
         data = load_data(self.train_path, aws_access_key, aws_secret_key, self.name)
 
-        if self.test_path:
-            if self.name.endswith('.csv'):
-                test_name = self.name.replace('.csv', '_test.csv')
-            else:
-                test_name = self.name + '_test'
-
-            test_data = load_data(test_name, self.test_path,
-                                  aws_access_key, aws_secret_key)
-            return data, test_data
-
-        else:
-            return train_test_split(data, test_size=test_size, random_state=random_state)
+        # if self.test_path:
+        #     if self.name.endswith('.csv'):
+        #         test_name = self.name.replace('.csv', '_test.csv')
+        #     else:
+        #         test_name = self.name + '_test'
+        #
+        #     test_data = load_data(test_name, self.test_path,
+        #                           aws_access_key, aws_secret_key)
+        #     return data, test_data
+        #
+        # else:
+        return data  # train_test_split(data, test_size=test_size, random_state=random_state)
 
     @staticmethod
     def _make_name(path):
@@ -188,11 +189,11 @@ class Dataset(Base):
                  one_nn_sd=None, best_node_mean=None, best_node_sd=None, best_random=None, best_worst=None,
                  linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
                  nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None, pct_inst_mv=None,
-                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None):
+                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None, depth: int = 0):
 
         self.train_path = train_path
         self.test_path = test_path
-        self.reference_path = reference_path
+        # self.reference_path = reference_path
         self.name = name or self._make_name(train_path)
         self.status = status
         self.id: Optional[int] = id
@@ -201,6 +202,7 @@ class Dataset(Base):
         self.processed: Optional[int] = processed
         self.budget: Optional[int] = budget
         self.class_column = class_column
+        self.depth: int = depth
 
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
@@ -309,12 +311,17 @@ class Algorithm(Base):
     host = Column(String)
 
     @property
-    def hyperparameter_values(self):
+    def hyperparameter_values(self) -> dict:
         return base_64_to_object(self.hyperparameter_values_64)
 
     @hyperparameter_values.setter
-    def hyperparameter_values(self, value):
-        self.hyperparameter_values_64 = object_to_base_64(value)
+    def hyperparameter_values(self, value: Configuration):
+        if value is None:
+            d = {}
+        else:
+            d = value.get_dictionary()
+
+        self.hyperparameter_values_64 = object_to_base_64(d)
 
     @property
     def mu_sigma_judgment_metric(self):
@@ -332,7 +339,7 @@ class Algorithm(Base):
                  start_time: datetime = None,
                  end_time: datetime = None,
                  error_message: str = None,
-                 hyperparameter_values=None,
+                 hyperparameter_values: Configuration = None,
                  host=None):
 
         self.algorithm: str = algorithm
@@ -476,7 +483,7 @@ class Database(object):
 
     @try_with_session()
     def get_dataset(self, dataset_id):
-        """ Get a specific datarun. """
+        """ Get a specific dataset. """
         return self.session.query(Dataset).get(dataset_id)
 
     @try_with_session()
@@ -559,18 +566,20 @@ class Database(object):
         Save a new, fully qualified algorithm object to the database.
         Returns: the ID of the newly-created algorithm
         """
-
+        dataset = self.get_dataset(dataset_id)
+        dataset.processed += 1
         self.session.add(algorithm)
         return algorithm
 
     @try_with_session(commit=True)
-    def complete_algorithm(self, algorithm_id, accuracy: float = None, av_precision: float = None, f1: float = None,
-                           precision: float = None, recall: float = None, neg_log_loss: float = None, roc_auc: float = None):
+    def complete_algorithm(self, algorithm_id, dataset, accuracy: float = None, av_precision: float = None,
+                           f1: float = None, precision: float = None, recall: float = None, neg_log_loss: float = None,
+                           roc_auc: float = None):
         """
         Set all the parameters on a algorithm that haven't yet been set, and mark
         it as complete.
         """
-        # TODO adapt
+
         algorithm = self.session.query(Algorithm).get(algorithm_id)
 
         algorithm.accuracy = accuracy
@@ -609,10 +618,9 @@ class Database(object):
     def mark_dataset_complete(self, dataset_id: int) -> None:
         """
         Set the status of the dataset to COMPLETE and set the 'end_time' field
-        to the current datetime. Count 'processed' up.
+        to the current datetime.
         """
         dataset = self.get_dataset(dataset_id)
         dataset.status = RunStatus.COMPLETE
         dataset.end_time = datetime.now()
-        # TODO ist richtig muss aber zu algorithm completed
-        dataset.processed += 1
+

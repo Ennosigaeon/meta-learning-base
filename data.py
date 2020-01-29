@@ -1,13 +1,11 @@
 import logging
 import os
+from typing import Tuple
 
 import boto3
 import pandas as pd
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
-from config import GenericConfig
-import argparse
-from typing import Tuple
 
 LOGGER = logging.getLogger('mlb')
 
@@ -61,8 +59,7 @@ def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
 
 def store_data(df: pd.DataFrame, train_path) -> str:
 
-    # TODO
-    export_csv = df.to_csv(path_or_buf=train_path, header=False, index=False)
+    export_csv = df.to_csv(path_or_buf=train_path, header=True, index=False)
 
     return export_csv
 

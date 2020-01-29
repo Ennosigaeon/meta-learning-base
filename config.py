@@ -3,6 +3,7 @@
 from __future__ import absolute_import, unicode_literals
 
 import argparse
+import os
 from builtins import object
 
 import yaml
@@ -172,7 +173,11 @@ class LogConfig(Config):
 
 
 class GenericConfig(Config):
+    """ Generic configurations """
+    _CONFIG = 'run'
+
     data_dir = {
         'help': 'Path to data location',
-        'default': '/vagrant/data/'  # C:\Users\usidflorsc\Documents\PycharmProjects\meta-learning-base\data
+        'default': '/vagrant/data/',  # os.getcwd(),  # C:\Users\usidflorsc\Documents\PycharmProjects\meta-learning-base\data
+        'required': True
     }
