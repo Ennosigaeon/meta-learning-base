@@ -93,27 +93,101 @@ class Metafeatures(object):
 
         class NumberOfMissingValues(MetaFeature):
             def _calculate(self, X, y, categorical):
-                missing = ~np.isfinite(X)
-                missing = missing.sum().sum()
-                return missing
+
+                X_numeric = X.select_dtypes(include=['float64', 'int64'])
+                X_object = X.select_dtypes(include=['object'])
+
+                if X_object.empty:
+
+                    missing = ~np.isfinite(X_numeric)
+                    missing = missing.sum().sum()
+
+                    return missing
+
+                else:
+
+                    missing_o = pd.isna(X_object)
+                    missing_o = missing_o.sum().sum()
+
+                    missing_n = ~np.isfinite(X_numeric)
+                    missing_n = missing_n.sum().sum()
+
+                    missing = missing_n + missing_o
+
+                    return missing
 
         class PercentageOfMissingValues(MetaFeature):
             def _calculate(self, X, y, categorical):
-                missing = ~np.isfinite(X)
-                missing = missing.sum().sum()
-                return float(missing) / float(X.shape[0] * X.shape[1])
+
+                X_numeric = X.select_dtypes(include=['float64', 'int64'])
+                X_object = X.select_dtypes(include=['object'])
+
+                if X_object.empty:
+
+                    missing = ~np.isfinite(X_numeric)
+                    missing = missing.sum().sum()
+
+                    return float(missing) / float(X.shape[0] * X.shape[1])
+
+                else:
+
+                    missing_o = pd.isna(X_object)
+                    missing_o = missing_o.sum().sum()
+
+                    missing_n = ~np.isfinite(X_numeric)
+                    missing_n = missing_n.sum().sum()
+
+                    missing = missing_n + missing_o
+
+                    return float(missing) / float(X.shape[0] * X.shape[1])
 
         class NumberOfInstancesWithMissingValues(MetaFeature):
             def _calculate(self, X, y, categorical):
-                missing = ~np.isfinite(X)
-                num_missing = missing.sum(axis=1)
-                return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
+
+                X_numeric = X.select_dtypes(include=['float64', 'int64'])
+                X_object = X.select_dtypes(include=['object'])
+
+                if X_object.empty:
+
+                    missing = ~np.isfinite(X_numeric)
+                    num_missing = missing.sum(axis=1)
+
+                    return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
+
+                else:
+
+                    missing_o = pd.isna(X_object)
+                    num_missing_o = missing_o.sum(axis=1)
+
+                    missing_n = ~np.isfinite(X_numeric)
+                    num_missing_n = missing_n.sum(axis=1)
+                    num_missing = num_missing_n + num_missing_o
+
+                    return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
 
         class NumberOfFeaturesWithMissingValues(MetaFeature):
             def _calculate(self, X, y, categorical):
-                missing = ~np.isfinite(X)
-                num_missing = missing.sum(axis=0)
-                return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
+
+                X_numeric = X.select_dtypes(include=['float64', 'int64'])
+                X_object = X.select_dtypes(include=['object'])
+
+                if X_object.empty:
+
+                    missing = ~np.isfinite(X_numeric)
+                    num_missing = missing.sum(axis=0)
+
+                    return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
+
+                else:
+
+                    missing_o = pd.isna(X_object)
+                    num_missing_o = missing_o.sum(axis=0)
+
+                    missing_n = ~np.isfinite(X_numeric)
+                    num_missing_n = missing_n.sum(axis=0)
+                    num_missing = num_missing_n + num_missing_o
+
+                    return int(np.sum([1 if num > 0 else 0 for num in num_missing]))
 
         class ClassOccurrences(MetaFeature):
             def _calculate(self, X, y, categorical):

@@ -12,15 +12,17 @@ import warnings
 from builtins import str
 
 import numbers
+from math import log
+
 import numpy as np
 from sklearn.base import is_classifier, clone
 from sklearn.exceptions import FitFailedWarning
 from sklearn.externals.joblib import Parallel, delayed
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, log_loss
 from sklearn.metrics.scorer import _check_multimetric_scoring
 from sklearn.model_selection import check_cv
 from sklearn.model_selection._validation import _aggregate_score_dicts, _index_param_value, _score
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, LabelEncoder, OneHotEncoder
 from sklearn.utils import indexable
 from sklearn.utils.deprecation import DeprecationDict
 from sklearn.utils.metaestimators import _safe_split
@@ -223,3 +225,18 @@ def multiclass_roc_auc_score(y_test, y_pred, average="macro"):
     y_pred = lb.transform(y_pred)
 
     return roc_auc_score(y_test, y_pred, average=average)
+
+
+def logloss(y_test, y_pred):
+    """
+    # TODO maybe check if multiclass or not. True -> multiclass_roc_auc_score, False -> roc_auc_score
+
+    from https://medium.com/@plog397/auc-roc-curve-scoring-function-for-multi-class-classification-9822871a6659
+    """
+    lb = LabelBinarizer()
+    lb.fit(y_test)
+
+    y_test = lb.transform(y_test)
+    y_pred = lb.transform(y_pred)
+
+    return log_loss(y_test, y_pred)

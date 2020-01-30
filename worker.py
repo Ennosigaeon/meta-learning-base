@@ -10,14 +10,13 @@ from typing import Optional, Tuple, Dict, TYPE_CHECKING
 import pandas as pd
 from autosklearn.metrics import average_precision
 from sklearn.base import BaseEstimator, is_classifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, log_loss, roc_auc_score, \
-    precision_recall_fscore_support
-from sklearn.model_selection import train_test_split, cross_validate, cross_val_predict
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, log_loss, roc_auc_score
+from sklearn.model_selection import cross_val_predict
 
 from constants import AlgorithmStatus
 from database import Database, Algorithm
 from methods import ALGORITHMS
-from utilities import ensure_directory, multiclass_roc_auc_score
+from utilities import ensure_directory, multiclass_roc_auc_score, logloss
 
 if TYPE_CHECKING:
     from core import Core
@@ -100,13 +99,14 @@ class Worker(object):
             # av_precision = average_precision(y, y_pred)
             recall = recall_score(y, y_pred, average='macro')
             f1 = f1_score(y, y_pred, average='macro')
-            # neg_log_loss = log_loss(y, y_pred)  # ValueError: could not convert string to float: 'Iris-setosa'
+            log_loss = logloss(y, y_pred)  # ValueError: could not convert string to float: 'Iris-setosa'
             roc_auc = multiclass_roc_auc_score(y, y_pred, average='macro')
 
             # --> not multiclass
 
             """Convert np array y_pred to pd series and add it to X"""
             y_pred = pd.Series(y_pred)
+            # y_pred = y_pred.astype('float64').dtype
             X = pd.concat([X, y_pred], axis=1)
 
             return X, {'accuracy': accuracy,
@@ -114,7 +114,7 @@ class Worker(object):
                        # 'av_precision': av_precision,
                        'recall': recall,
                        'f1': f1,
-                       # 'neg_log_loss': neg_log_loss,
+                       'neg_log_loss': log_loss,
                        'roc_auc': roc_auc
                        }
         else:
