@@ -90,23 +90,25 @@ class Worker(object):
 
         if is_classifier(algorithm):
             """Predict labels with 5 fold cross validation"""
+            # TODO muss auch objects handeln können
             y_pred = cross_val_predict(algorithm, X, y, cv=5)
+            # -> nach einem kompletten durchlauf von iris ValueError: could not convert string to float: 'Iris-setosa'
+            # -> LabelBinarizer()? siehe utilities.logloss
 
-            # switch/if else ob multiclass oder nicht
+            # TODO switch/if else ob multiclass oder nicht
             # --> multiclass
             accuracy = accuracy_score(y, y_pred)
             precision = precision_score(y, y_pred, average='macro')
             # av_precision = average_precision(y, y_pred)
             recall = recall_score(y, y_pred, average='macro')
             f1 = f1_score(y, y_pred, average='macro')
-            log_loss = logloss(y, y_pred)  # ValueError: could not convert string to float: 'Iris-setosa'
+            log_loss = logloss(y, y_pred)
             roc_auc = multiclass_roc_auc_score(y, y_pred, average='macro')
 
             # --> not multiclass
 
             """Convert np array y_pred to pd series and add it to X"""
             y_pred = pd.Series(y_pred)
-            # y_pred = y_pred.astype('float64').dtype
             X = pd.concat([X, y_pred], axis=1)
 
             return X, {'accuracy': accuracy,
