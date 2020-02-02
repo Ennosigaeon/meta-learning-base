@@ -58,14 +58,11 @@ def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
 
 
 def store_data(df: pd.DataFrame, train_path) -> str:
-
-    export_csv = df.to_csv(path_or_buf=train_path, header=True, index=False)
-
-    return export_csv
+    return df.to_csv(path_or_buf=train_path, header=True, index=False)
 
 
 def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,
-               name: str = None) -> Tuple[str, str]:
+                name: str = None) -> Tuple[str, str]:
     client: BaseClient = boto3.client(
         's3',
         endpoint_url=s3_endpoint,

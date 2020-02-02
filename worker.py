@@ -161,16 +161,16 @@ class Worker(object):
             self.core.add_dataset(new_dataset, class_column, depth=depth)
             LOGGER.info('Transformed dataset will be stored in DB.')
 
-    """
-    Check if dataset is finished
-    
-    First is_dataset_finished checks if there are algorithms for this dataset in the database marked as pending or
-    started. If there are none it returns False.
-    
-    Then is_dataset_finished checks if a dataset has enough budget for all the algorithms in the list.
-    If the dataset has run out of budget, is_data_set returns True.
-    """
     def is_dataset_finished(self):
+        """
+        Check if dataset is finished
+
+        First is_dataset_finished checks if there are algorithms for this dataset in the database marked as pending or
+        started. If there are none it returns False.
+
+        Then is_dataset_finished checks if a dataset has enough budget for all the algorithms in the list.
+        If the dataset has run out of budget, is_data_set returns True.
+        """
         algorithms = self.db.get_algorithms(dataset_id=self.dataset.id, ignore_complete=False)
         # No algorithms for this data set started yet
         if not algorithms:

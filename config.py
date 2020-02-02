@@ -3,7 +3,6 @@
 from __future__ import absolute_import, unicode_literals
 
 import argparse
-import os
 from builtins import object
 
 import yaml
@@ -40,7 +39,6 @@ class Config(object):
         if use_prefix:
             name = cls._add_prefix(name)
 
-        required = False
         if isinstance(class_value, dict):
             required = 'default' not in class_value
             default = class_value.get('default')
@@ -178,6 +176,7 @@ class GenericConfig(Config):
 
     data_dir = {
         'help': 'Path to data location',
-        'default': '/vagrant/data/',  # os.getcwd(),  # C:\Users\usidflorsc\Documents\PycharmProjects\meta-learning-base\data
+        'default': '/vagrant/data/',
+        # os.getcwd(),  # C:\Users\usidflorsc\Documents\PycharmProjects\meta-learning-base\data
         'required': True
     }

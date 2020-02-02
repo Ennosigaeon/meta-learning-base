@@ -15,7 +15,6 @@ from ConfigSpace.configuration_space import ConfigurationSpace, Configuration
 from ConfigSpace.hyperparameters import UniformIntegerHyperparameter, UniformFloatHyperparameter, \
     CategoricalHyperparameter
 from sklearn.base import BaseEstimator
-from sklearn.model_selection import train_test_split
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
@@ -155,22 +154,8 @@ class Dataset(Base):
     naive_bayes_mean = Column(Numeric)
     naive_bayes_sd = Column(Numeric)
 
-    def load(self, test_size=0.3, random_state=0,
-             aws_access_key=None, aws_secret_key=None):
-        data = load_data(self.train_path, aws_access_key, aws_secret_key, self.name)
-
-        # if self.test_path:
-        #     if self.name.endswith('.csv'):
-        #         test_name = self.name.replace('.csv', '_test.csv')
-        #     else:
-        #         test_name = self.name + '_test'
-        #
-        #     test_data = load_data(test_name, self.test_path,
-        #                           aws_access_key, aws_secret_key)
-        #     return data, test_data
-        #
-        # else:
-        return data  # train_test_split(data, test_size=test_size, random_state=random_state)
+    def load(self, aws_access_key=None, aws_secret_key=None):
+        return load_data(self.train_path, aws_access_key, aws_secret_key, self.name)
 
     @staticmethod
     def _make_name(path):
@@ -190,7 +175,6 @@ class Dataset(Base):
                  linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
                  nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None, pct_inst_mv=None,
                  pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None, depth: int = 0):
-
         self.train_path = train_path
         self.test_path = test_path
         # self.reference_path = reference_path
@@ -289,7 +273,6 @@ class Algorithm(Base):
     """
     # base 64 encoding of the hyperparameter names and values
     hyperparameter_values_64 = Column(Text)
-    hyperparameter_values = Column(Text)
     accuracy = Column(Numeric(precision=20, scale=10))
     average_precision = Column(Numeric(precision=20, scale=10))
     f1_score = Column(Numeric(precision=20, scale=10))
@@ -358,7 +341,7 @@ class Algorithm(Base):
         method: method code or path to JSON file containing all the information
             needed to specify this enumerator.
         """
-        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm) # + '.json'
+        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm)  # + '.json'
 
         with open(config_path) as f:
             config = json.load(f)
@@ -623,4 +606,3 @@ class Database(object):
         dataset = self.get_dataset(dataset_id)
         dataset.status = RunStatus.COMPLETE
         dataset.end_time = datetime.now()
-

@@ -7,26 +7,11 @@ import json
 import logging
 import os
 import pickle
-import time
-import warnings
 from builtins import str
 
-import numbers
-from math import log
-
 import numpy as np
-from sklearn.base import is_classifier, clone
-from sklearn.exceptions import FitFailedWarning
-from sklearn.externals.joblib import Parallel, delayed
 from sklearn.metrics import roc_auc_score, log_loss
-from sklearn.metrics.scorer import _check_multimetric_scoring
-from sklearn.model_selection import check_cv
-from sklearn.model_selection._validation import _aggregate_score_dicts, _index_param_value, _score
-from sklearn.preprocessing import LabelBinarizer, LabelEncoder, OneHotEncoder
-from sklearn.utils import indexable
-from sklearn.utils.deprecation import DeprecationDict
-from sklearn.utils.metaestimators import _safe_split
-from sklearn.utils.validation import _num_samples
+from sklearn.preprocessing import LabelBinarizer
 
 logger = logging.getLogger('mlb')
 
