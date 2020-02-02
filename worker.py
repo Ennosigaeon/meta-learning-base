@@ -8,9 +8,8 @@ from datetime import datetime
 from typing import Optional, Tuple, Dict, TYPE_CHECKING
 
 import pandas as pd
-from autosklearn.metrics import average_precision
 from sklearn.base import BaseEstimator, is_classifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, log_loss, roc_auc_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import cross_val_predict
 
 from constants import AlgorithmStatus

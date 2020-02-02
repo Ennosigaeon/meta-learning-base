@@ -162,6 +162,7 @@ class Dataset(Base):
         md5 = hashlib.md5(path.encode('utf-8'))
         return md5.hexdigest()
 
+    # TODO check which parameters are really necessary and delete rest
     def __init__(self, train_path, test_path=None, reference_path=None, name=None, id=None, status=RunStatus.PENDING,
                  start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 10,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,

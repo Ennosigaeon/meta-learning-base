@@ -5,21 +5,19 @@ executing and orchestrating the main Core functionalities.
 """
 
 import logging
-import os
 import random
 import time
 import uuid
 from operator import attrgetter
 
+import pandas as pd
 from tqdm import tqdm
 
-from config import GenericConfig
 from constants import RunStatus
 from data import store_data
 from database import Database
-from metafeatures import Metafeatures
+from metafeatures import MetaFeatures
 from worker import AlgorithmError, Worker
-import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,9 +33,12 @@ class Core(object):
             database: str = 'assets/ml-base.db',
             username: str = None,
             password: str = None,
-            host=None,
-            port=None,
+            host: str = None,
+            port: int = None,
             query=None,
+
+            # Generic Conf,
+            work_dir: str = None,
 
             # S3 Conf
             endpoint: str = None,
@@ -50,8 +51,9 @@ class Core(object):
             metrics_dir: str = 'metrics',
             verbose_metrics: bool = False,
     ):
-        self.metafeatures = Metafeatures()
+        self.metafeatures = MetaFeatures()
         self.db = Database(dialect, database, username, password, host, port, query)
+        self.work_dir = work_dir
         self.s3_endpoint: str = endpoint
         self.s3_bucket: str = bucket
         self.s3_access_key: str = access_key
@@ -61,7 +63,7 @@ class Core(object):
         self.metrics_dir: str = metrics_dir
         self.verbose_metrics: bool = verbose_metrics
 
-    def add_dataset(self, df: pd.DataFrame, class_column: str, depth, name=None):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, name: str = None):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
@@ -76,33 +78,19 @@ class Core(object):
 
         """
 
-        if not name:
-            # 1. Train Path berechnen
-            rn_uuid = uuid.uuid4()
-            # --> berechnet zufällige uuid und speichert sie in rn_uuid
-            name = str(rn_uuid)  # .replace("-", "")
-            # --> wandelt rn_uuid in str um
-        else:
-            return name
+        if not name or name.strip() == '':
+            name = str(uuid.uuid4())
 
-        data_path = GenericConfig.data_dir.get("default", "")
-        # --> speichert pfad von data_dir in variable data_path
-        train_path = os.path.join(data_path, name + '.csv')
-        # --> generiert train_path aus data_path und der in name gespeicherten uuid
-
-        # 2. Speichern vom DataFrame in [...]/data/
-        store_data(df, train_path)
-
-        # store_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
+        local_file = store_data(df, self.work_dir, name)
+        # TODO upload data to S3 bucket via data.upload_data(...)
+        # upload_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
 
         # 3. Metafeatures berechnen
-        mf = self.metafeatures.calculate_metafeatures(df=df,
-                                                      class_column=class_column
-                                                      )
+        mf = self.metafeatures.calculate(df=df, class_column=class_column)
 
         # 4. Speichern in Datenbank
         return self.db.create_dataset(
-            train_path=train_path,
+            train_path=local_file,
             name=name,
             class_column=class_column,
             depth=depth,

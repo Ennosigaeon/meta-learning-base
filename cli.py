@@ -3,7 +3,7 @@
 import argparse
 import logging
 
-from config import S3Config, DatasetConfig, LogConfig, SQLConfig
+from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig
 from core import Core
 from data import load_data
 
@@ -14,11 +14,13 @@ def _get_core(args) -> Core:
     sql_conf = SQLConfig(args)
     s3_conf = S3Config(args)
     log_conf = LogConfig(args)
+    generic_conf = GenericConfig(args)
 
     # Build params dictionary to pass to Core.
     core_args = sql_conf.to_dict()
     core_args.update(s3_conf.to_dict())
     core_args.update(log_conf.to_dict())
+    core_args.update(generic_conf.to_dict())
 
     return Core(**core_args)
 
@@ -41,7 +43,7 @@ def _enter_data(args):
     df = load_data(dataset_conf.train_path)
     class_column = dataset_conf.class_column
 
-    dataset = core.add_dataset(df, class_column, 0)
+    dataset = core.add_dataset(df, class_column, 0, dataset_conf.name)
 
     return dataset.id
 
@@ -62,6 +64,7 @@ def _get_parser():
     s3_args = S3Config.get_parser()
     log_args = LogConfig.get_parser()
     dataset_args = DatasetConfig.get_parser()
+    generic_args = GenericConfig.get_parser()
 
     # Enter Data Parser
     enter_data_parents = [
@@ -69,7 +72,8 @@ def _get_parser():
         sql_args,
         s3_args,
         dataset_args,
-        log_args
+        log_args,
+        generic_args
     ]
     enter_data = subparsers.add_parser('enter_data', parents=enter_data_parents,
                                        help='Add a Dataset and trigger a Datarun on it.')

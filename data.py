@@ -57,8 +57,17 @@ def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
     return pd.read_csv(path)
 
 
-def store_data(df: pd.DataFrame, train_path) -> str:
-    return df.to_csv(path_or_buf=train_path, header=True, index=False)
+def store_data(df: pd.DataFrame, work_dir: str, name: str, format: str = 'csv') -> str:
+    # TODO what if folder does not exist?
+    # TODO what if name already exists?
+    path = os.path.join(work_dir, name)
+
+    if format == 'csv':
+        path += '.csv'
+        df.to_csv(path_or_buf=path, header=True, index=False)
+        return path
+    else:
+        raise ValueError('Format \'{}\' currently not supported'.format(format))
 
 
 def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,

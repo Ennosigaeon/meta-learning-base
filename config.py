@@ -174,9 +174,8 @@ class GenericConfig(Config):
     """ Generic configurations """
     _CONFIG = 'run'
 
-    data_dir = {
+    work_dir = {
         'help': 'Path to data location',
         'default': '/vagrant/data/',
-        # os.getcwd(),  # C:\Users\usidflorsc\Documents\PycharmProjects\meta-learning-base\data
-        'required': True
+        'required': False
     }
