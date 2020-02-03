@@ -198,7 +198,7 @@ class MetaFeatures(object):
         mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
                              'attr_conc', 'sparsity', 'gravity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
                              'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
-                             'var_importance', 'one_nn', 'best_node', 'best_random', 'best_worst', 'linear_discr',
+                             'var_importance', 'one_nn', 'best_node', 'linear_discr',
                              'naive_bayes', 'leaves_per_class']),
                   random_state=random_state)
 
@@ -209,80 +209,75 @@ class MetaFeatures(object):
         """
         Mapping values to Meta Feature variables
         """
-        # TODO mapping only by index very prone to break on updates. Use f_name.index('')
-        nr_inst = f_value[30]
-        nr_attr = f_value[28]
-        nr_class = f_value[29]
-        nr_outliers = f_value[31]
+        nr_inst = f_value[f_name.index('nr_inst')]
+        nr_attr = f_value[f_name.index('nr_attr')]
+        nr_class = f_value[f_name.index('nr_class')]
+        nr_outliers = f_value[f_name.index('nr_outliers')]
 
-        skewness_mean = f_value[35]
-        skewness_sd = f_value[36]
-        kurtosis_mean = f_value[13]
-        kurtosis_sd = f_value[14]
-        cor_mean = f_value[7]
-        cor_sd = f_value[8]
-        cov_mean = f_value[9]
-        cov_sd = f_value[10]
-        attr_conc_mean = f_value[0]
-        attr_conc_sd = f_value[1]
-        sparsity_mean = f_value[37]
-        sparsity_sd = f_value[38]
-        gravity = f_value[12]
-        var_mean = f_value[39]
-        var_sd = f_value[40]
+        skewness_mean = f_value[f_name.index('skewness.mean')]
+        skewness_sd = f_value[f_name.index('skewness.sd')]
+        kurtosis_mean = f_value[f_name.index('kurtosis.mean')]
+        kurtosis_sd = f_value[f_name.index('kurtosis.sd')]
+        cor_mean = f_value[f_name.index('cor.mean')]
+        cor_sd = f_value[f_name.index('cor.sd')]
+        cov_mean = f_value[f_name.index('cov.mean')]
+        cov_sd = f_value[f_name.index('cov.sd')]
+        attr_conc_mean = f_value[f_name.index('attr_conc.mean')]
+        attr_conc_sd = f_value[f_name.index('attr_conc.sd')]
+        sparsity_mean = f_value[f_name.index('sparsity.mean')]
+        sparsity_sd = f_value[f_name.index('sparsity.sd')]
+        gravity = f_value[f_name.index('gravity')]
+        var_mean = f_value[f_name.index('var.mean')]
+        var_sd = f_value[f_name.index('var.sd')]
 
-        class_ent = f_value[6]
-        attr_ent_mean = f_value[2]
-        attr_ent_sd = f_value[3]
-        mut_inf_mean = f_value[22]
-        mut_inf_sd = f_value[23]
-        eq_num_attr = f_value[11]
-        ns_ratio = f_value[32]
+        class_ent = f_value[f_name.index('class_ent')]
+        attr_ent_mean = f_value[f_name.index('attr_ent.mean')]
+        attr_ent_sd = f_value[f_name.index('attr_ent.sd')]
+        mut_inf_mean = f_value[f_name.index('mut_inf.mean')]
+        mut_inf_sd = f_value[f_name.index('mut_inf.sd')]
+        eq_num_attr = f_value[f_name.index('eq_num_attr')]
+        ns_ratio = f_value[f_name.index('ns_ratio')]
 
-        nodes = f_value[26]
-        leaves = f_value[15]
-        leaves_branch_mean = f_value[16]
-        leaves_branch_sd = f_value[17]
-        nodes_per_attr = f_value[27]
-        leaves_per_class_mean = f_value[18]
-        leaves_per_class_sd = f_value[19]
-        var_importance_mean = f_value[41]
-        var_importance_sd = f_value[42]
+        nodes = f_value[f_name.index('nodes')]
+        leaves = f_value[f_name.index('leaves')]
+        leaves_branch_mean = f_value[f_name.index('leaves_branch.mean')]
+        leaves_branch_sd = f_value[f_name.index('leaves_branch.sd')]
+        nodes_per_attr = f_value[f_name.index('nodes_per_attr')]
+        leaves_per_class_mean = f_value[f_name.index('leaves_per_class.mean')]
+        leaves_per_class_sd = f_value[f_name.index('leaves_per_class.sd')]
+        var_importance_mean = f_value[f_name.index('var_importance.mean')]
+        var_importance_sd = f_value[f_name.index('var_importance.sd')]
 
-        one_nn_mean = f_value[33]
-        one_nn_sd = f_value[34]
-        best_node_mean = f_value[4]
-        best_node_sd = f_value[5]
-        # best_random = f_value[0]
-        # best_worst = f_value[0]
-        linear_discr_mean = f_value[20]
-        linear_discr_sd = f_value[21]
-        naive_bayes_mean = f_value[24]
-        naive_bayes_sd = f_value[25]
+        one_nn_mean = f_value[f_name.index('one_nn.mean')]
+        one_nn_sd = f_value[f_name.index('one_nn.sd')]
+        best_node_mean = f_value[f_name.index('best_node.mean')]
+        best_node_sd = f_value[f_name.index('best_node.sd')]
+        linear_discr_mean = f_value[f_name.index('linear_discr.mean')]
+        linear_discr_sd = f_value[f_name.index('linear_discr.sd')]
+        naive_bayes_mean = f_value[f_name.index('naive_bayes.mean')]
+        naive_bayes_sd = f_value[f_name.index('naive_bayes.sd')]
 
         # ##########################################################################
         # #  Extracting Meta Features with Auto-Sklearn  ###########################
         # ##########################################################################
 
-        # noinspection PyTypeChecker
-        # TODO Create instance and call method
-        nr_missing_values = NumberOfMissingValues._calculate(self, X, y, categorical=True)
-        # noinspection PyTypeChecker
-        pct_missing_values = PercentageOfMissingValues._calculate(self, X, y, categorical=True)
-        # noinspection PyTypeChecker
-        nr_inst_mv = NumberOfInstancesWithMissingValues._calculate(self, X, y, categorical=True)
+        nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
+
+        pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
+
+        nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
         pct_inst_mv = float(nr_inst_mv) / float(nr_inst)
-        # noinspection PyTypeChecker
-        nr_attr_mv = NumberOfFeaturesWithMissingValues._calculate(self, X, y, categorical=True)
+
+        nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
         pct_attr_mv = float(nr_attr_mv) / float(nr_attr)
-        # noinspection PyTypeChecker
-        class_prob_mean = ClassProbabilityMean._calculate(self, X, y, categorical=True)
-        # noinspection PyTypeChecker
-        class_prob_std = ClassProbabilitySTD._calculate(self, X, y, categorical=True)
-        # noinspection PyTypeChecker
-        # pca_95 = PCAFractionOfComponentsFor95PercentVariance._calculate(self, X, y, categorical=True)
-        # noinspection PyTypeChecker
-        # pca_skewness = PCASkewnessFirstPC._calculate(self, X, y, categorical=True)
+
+        class_prob_mean = ClassProbabilityMean()(X, y, categorical=True).value
+
+        class_prob_std = ClassProbabilitySTD()(X, y, categorical=True).value
+
+        # pca_95 = PCAFractionOfComponentsFor95PercentVariance()(X, y, categorical=True).value
+
+        # pca_skewness = PCASkewnessFirstPC())(X, y, categorical=True).value
 
         return {
             'nr_inst': nr_inst,
@@ -336,8 +331,6 @@ class MetaFeatures(object):
             'one_nn_sd': one_nn_sd,
             'best_node_mean': best_node_mean,
             'best_node_sd': best_node_sd,
-            # best_random:best_random,
-            # best_worst:best_worst,
             'linear_discr_mean': linear_discr_mean,
             'linear_discr_sd': linear_discr_sd,
             'naive_bayes_mean': naive_bayes_mean,

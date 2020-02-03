@@ -84,8 +84,6 @@ class Dataset(Base):
     class_column = Column(String(100))
 
     train_path = Column(String, nullable=False)
-    test_path = Column(String)
-    # reference_path = Column(String)
     status = Column(Enum(*RUN_STATUS))
     start_time = Column(DateTime)
     end_time = Column(DateTime)
@@ -147,8 +145,6 @@ class Dataset(Base):
     one_nn_sd = Column(Numeric)
     best_node_mean = Column(Numeric)
     best_node_sd = Column(Numeric)
-    # best_random = Column(Numeric)
-    # best_worst = Column(Numeric)
     linear_discr_mean = Column(Numeric)
     linear_discr_sd = Column(Numeric)
     naive_bayes_mean = Column(Numeric)
@@ -163,7 +159,7 @@ class Dataset(Base):
         return md5.hexdigest()
 
     # TODO check which parameters are really necessary and delete rest
-    def __init__(self, train_path, test_path=None, reference_path=None, name=None, id=None, status=RunStatus.PENDING,
+    def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
                  start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 10,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
@@ -172,13 +168,11 @@ class Dataset(Base):
                  mut_inf_sd=None, eq_num_attr=None, ns_ratio=None, nodes=None, leaves=None,
                  leaves_branch_mean=None, leaves_branch_sd=None, nodes_per_attr=None, leaves_per_class_mean=None,
                  leaves_per_class_sd=None, var_importance_mean=None, var_importance_sd=None, one_nn_mean=None,
-                 one_nn_sd=None, best_node_mean=None, best_node_sd=None, best_random=None, best_worst=None,
+                 one_nn_sd=None, best_node_mean=None, best_node_sd=None,
                  linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
                  nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None, pct_inst_mv=None,
                  pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None, depth: int = 0):
         self.train_path = train_path
-        self.test_path = test_path
-        # self.reference_path = reference_path
         self.name = name or self._make_name(train_path)
         self.status = status
         self.id: Optional[int] = id
@@ -240,8 +234,6 @@ class Dataset(Base):
         self.one_nn_sd = one_nn_sd
         self.best_node_mean = best_node_mean
         self.best_node_sd = best_node_sd
-        # self.best_random=best_random
-        # self.best_worst=best_worst
         self.linear_discr_mean = linear_discr_mean
         self.linear_discr_sd = linear_discr_sd
         self.naive_bayes_mean = naive_bayes_mean
