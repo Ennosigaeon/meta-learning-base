@@ -42,6 +42,8 @@ class Worker(object):
                  s3_bucket: str = None,
                  models_dir: str = 'models',
                  metrics_dir: str = 'metrics',
+
+                 max_pipeline_depth: int = 5,
                  verbose_metrics: bool = False):
 
         self.db = database
@@ -55,6 +57,8 @@ class Worker(object):
 
         self.models_dir = models_dir
         self.metrics_dir = metrics_dir
+
+        self.max_pipeline_depth = max_pipeline_depth
         self.verbose_metrics = verbose_metrics
         ensure_directory(self.models_dir)
         ensure_directory(self.metrics_dir)
@@ -64,7 +68,7 @@ class Worker(object):
         """
         self.dataset = self.db.get_dataset(self.dataset.id)
 
-    def transform_dataset(self, algorithm: BaseEstimator) -> Tuple[pd.DataFrame, Dict[str, float]]:
+    def transform_dataset(self, algorithm: BaseEstimator, n_folds: int = 5) -> Tuple[pd.DataFrame, Dict[str, float]]:
         """
         Given a set of fully-qualified hyperparameters, create and test a
         algorithm model.
@@ -90,7 +94,7 @@ class Worker(object):
         if is_classifier(algorithm):
             """Predict labels with 5 fold cross validation"""
             # TODO muss auch objects handeln können
-            y_pred = cross_val_predict(algorithm, X, y, cv=5)
+            y_pred = cross_val_predict(algorithm, X, y, cv=n_folds)
             # -> nach einem kompletten durchlauf von iris ValueError: could not convert string to float: 'Iris-setosa'
             # -> LabelBinarizer()? siehe utilities.logloss
 
@@ -120,7 +124,12 @@ class Worker(object):
                        }
         else:
             """Call fit_transform on X, y and safe the transformed dataset in X"""
-            X = algorithm.fit_transform(X, y)
+            if hasattr(algorithm, 'fit_transform'):
+                X = algorithm.fit_transform(X, y)
+            else:
+                # noinspection PyUnresolvedReferences
+                X = algorithm.fit(X, y).transform(X)
+
             return X, {}
 
     def save_algorithm(self, algorithm_id: Optional[int], res: Tuple[pd.DataFrame, Dict[str, float]]) -> None:
@@ -137,26 +146,25 @@ class Worker(object):
             for the model.
         """
         """Load input dataset and class_column. Drop class_column from input dataset."""
-        dataset = self.dataset.load()
+        input_df = self.dataset.load()
         class_column = self.dataset.class_column
-        dataset, dataset_class_column = dataset.drop(class_column, axis=1), dataset[class_column]
+        input_df, dataset_class_column = input_df.drop(class_column, axis=1), input_df[class_column]
 
         """Call complete_algorithm to save the algorithm to the database."""
         self.db.complete_algorithm(algorithm_id=algorithm_id, dataset=self.dataset, **res[1])
         LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
 
         """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
-        if res[0].equals(dataset):
+        # TODO use is_close or pandas equivalent
+        if res[0].equals(input_df):
             LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
                         .format(self.dataset.id))
 
         else:
             """Load class_column and join transformed dataset with removed class_column of the input dataset.
             Add transformed dataset to DB"""
-            class_column = self.dataset.class_column
             new_dataset = pd.concat([res[0], dataset_class_column], axis=1)
-            depth = self.dataset.depth  # unsupported operand type(s) for +: 'NoneType' and 'int'
-            depth += 1
+            depth = self.dataset.depth + 1
             self.core.add_dataset(new_dataset, class_column, depth=depth)
             LOGGER.info('Transformed dataset will be stored in DB.')
 
@@ -177,11 +185,11 @@ class Worker(object):
 
         n_completed = len(algorithms)
         if n_completed >= self.dataset.budget:
-            LOGGER.warning('Algorithm budget for dataset {} has run out!'.format(self.dataset))
+            LOGGER.info('Algorithm budget for dataset {} has run out!'.format(self.dataset))
             return True
 
-        if self.dataset.depth >= 5:
-            LOGGER.warning('Dataset {} has reached max depth!'.format(self.dataset))
+        if self.dataset.depth >= self.max_pipeline_depth:
+            LOGGER.info('Dataset {} has reached max depth!'.format(self.dataset))
             return True
 
         return False
@@ -204,17 +212,16 @@ class Worker(object):
             Mark the run as done successfully
             """
             self.db.mark_dataset_complete(self.dataset.id)
-            LOGGER.warning('Dataset {} has been marked as complete.'.format(self.dataset))
+            LOGGER.info('Dataset {} has been marked as complete.'.format(self.dataset))
             return
 
         """
         Choose a random algorithm to work on the dataset
         """
         try:
-            LOGGER.debug('Choosing algorithm...')
+            LOGGER.info('Starting new algorithm...')
             algorithm = Algorithm(random.choice(ALGORITHMS),
                                   dataset_id=self.dataset.id,
-                                  hyperparameter_values=None,
                                   status=AlgorithmStatus.RUNNING,
                                   start_time=datetime.now())
 
@@ -222,26 +229,25 @@ class Worker(object):
             params = algorithm.random_config()
             algorithm.hyperparameter_values = params
 
-        except Exception:
-            LOGGER.error('Error choosing hyperparameters: dataset={}'.format(self.dataset))
+            param_info = 'Chose parameters for algorithm "{}":'.format(algorithm.class_path)
+            for k in sorted(params.keys()):
+                param_info += '\n\t{} = {}'.format(k, params[k])
+            LOGGER.debug(param_info)
+        except Exception as ex:
+            if isinstance(ex, KeyboardInterrupt):
+                raise ex
+            LOGGER.error('Error choosing algorithm with hyperparameters for dataset {}'.format(self.dataset))
             LOGGER.error(traceback.format_exc())
             raise AlgorithmError()
-
-        param_info = 'Chose parameters for algorithm "{}":'.format(algorithm.class_path)
-        for k in sorted(params.keys()):
-            param_info += '\n\t{} = {}'.format(k, params[k])
-        LOGGER.info(param_info)
-
-        LOGGER.debug('Creating algorithm...')
 
         """
         Start the algorithm (add it to database)
         """
-        algorithm = self.db.start_algorithm(dataset_id=self.dataset.id,
-                                            host=HOSTNAME,
-                                            algorithm=algorithm,
-                                            start_time=algorithm.start_time,
-                                            status=algorithm.status)
+        algorithm = self.db.create_algorithm(dataset_id=self.dataset.id,
+                                             host=HOSTNAME,
+                                             algorithm=algorithm,
+                                             start_time=algorithm.start_time,
+                                             status=algorithm.status)
 
         """
         Transform the dataset and save the algorithm

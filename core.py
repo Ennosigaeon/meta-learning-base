@@ -109,7 +109,7 @@ class Core(object):
             Algorithm:
                 The created algorithm.
         """
-        return self.db.start_algorithm(
+        return self.db.create_algorithm(
             dataset_id=ds_id,
             algorithm=algorithm
         )
@@ -142,8 +142,7 @@ class Core(object):
             datasets = self.db.get_datasets()
             if not datasets:
                 if wait:
-                    LOGGER.debug('No datasets found. Sleeping %d seconds and trying again.',
-                                 self._LOOP_WAIT)
+                    LOGGER.debug('No datasets found. Sleeping %d seconds and trying again.', self._LOOP_WAIT)
                     time.sleep(self._LOOP_WAIT)
                     continue
 
@@ -155,6 +154,7 @@ class Core(object):
             Either choose a dataset randomly between priority, or take the dataset with the lowest ID
             """
             if choose_randomly:
+                # TODO chooses randomly between running and pending data sets. Should finish running datasets first
                 ds = random.choice(datasets)
             else:
                 ds = sorted(datasets, key=attrgetter('id'))[0]
@@ -162,45 +162,33 @@ class Core(object):
             """
             Mark dataset as RUNNING
             """
-            # noinspection PyTypeChecker
-            self.db.mark_dataset_running(ds.id)
+            try:
+                self.db.mark_dataset_running(ds.id)
+            except UserWarning:
+                LOGGER.warning('Skipping completed dataset: {}'.format(ds.id))
 
             LOGGER.info('Computing on dataset {}'.format(ds.id))
-
-            """>> Actual work happens here <<
-            
-            Create instance of Worker
-            """
-            worker = Worker(self.db, ds, self, s3_access_key=self.s3_access_key,
-                            s3_secret_key=self.s3_secret_key, s3_bucket=self.s3_bucket, models_dir=self.models_dir,
-                            metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
 
             """
             Progress bar
             """
             try:
-                pbar = tqdm(
-                    total=ds.budget,
-                    ascii=True,
-                    initial=ds.processed,
-                    disable=not verbose
-                )
+                pbar = tqdm(total=ds.budget, ascii=True, initial=ds.processed, disable=not verbose)
 
-                """
-                As long as there are datasets which aren't marked as completed yet -> run_algorithm
-                """
-                while ds.status != RunStatus.COMPLETE:
+                worker = Worker(self.db, ds, self, s3_access_key=self.s3_access_key, s3_secret_key=self.s3_secret_key,
+                                s3_bucket=self.s3_bucket, models_dir=self.models_dir, metrics_dir=self.metrics_dir,
+                                verbose_metrics=self.verbose_metrics)
+
+                while ds.status == RunStatus.RUNNING:
                     worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)
                     if verbose and ds.completed_algorithm > pbar.last_print_n:
                         pbar.update(ds.completed_algorithm - pbar.last_print_n)
 
                 pbar.close()
-
             except AlgorithmError:
                 """ 
-                The exception has already been handled; just wait a sec so we
-                don't go out of control reporting errors
+                The exception has already been handled; just wait a sec so we don't go out of control reporting errors
                 """
-                LOGGER.error('Something went wrong. Sleeping %d seconds.', self._LOOP_WAIT)
+                LOGGER.error('Something went wrong. Sleeping {} seconds.'.format(self._LOOP_WAIT))
                 time.sleep(self._LOOP_WAIT)

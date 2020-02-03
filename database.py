@@ -319,7 +319,7 @@ class Algorithm(Base):
                  algorithm: str,
                  dataset_id: int,
                  id: int = None,
-                 status=None,
+                 status: AlgorithmStatus = None,
                  start_time: datetime = None,
                  end_time: datetime = None,
                  error_message: str = None,
@@ -380,6 +380,7 @@ class Algorithm(Base):
             else:
                 raise ValueError(f'Unknown hyperparameter type {param_type}')
 
+        # noinspection PyTypeChecker
         cs.add_hyperparameters(self.parameters.values())
 
         for condition, dic in self.conditions.items():
@@ -396,7 +397,10 @@ class Algorithm(Base):
 
     def instance(self, params: Dict[str, Any] = None) -> BaseEstimator:
         if params is None:
-            params = self.random_config()
+            if self.hyperparameter_values is None:
+                params = self.random_config()
+            else:
+                params = self.hyperparameter_values
 
         module_name = self.class_path.rpartition(".")[0]
         class_name = self.class_path.split(".")[-1]
@@ -493,7 +497,7 @@ class Database(object):
 
         datasets = query.all()
 
-        if not len(datasets):
+        if len(datasets) == 0:
             return None
         return datasets
 
@@ -542,14 +546,15 @@ class Database(object):
         return dataset
 
     @try_with_session(commit=True)
-    def start_algorithm(self,
-                        dataset_id: int,
-                        algorithm: Algorithm, start_time, status, host,
-                        hyperparameter_values: Dict = None) -> Algorithm:
+    def create_algorithm(self,
+                         dataset_id: int,
+                         algorithm: Algorithm, start_time, status, host,
+                         hyperparameter_values: Dict = None) -> Algorithm:
         """
         Save a new, fully qualified algorithm object to the database.
         Returns: the ID of the newly-created algorithm
         """
+        # TODO for all cases where only a single record is updated: https://stackoverflow.com/a/278606/3447557
         dataset = self.get_dataset(dataset_id)
         dataset.processed += 1
         self.session.add(algorithm)
@@ -591,19 +596,34 @@ class Database(object):
     @try_with_session(commit=True)
     def mark_dataset_running(self, dataset_id: int) -> None:
         """
-        Set the status of the dataset to RUNNING and set the 'start_time' field
-        to the current datetime.
+        Set the status of the dataset to RUNNING and set the 'start_time' field to the current datetime.
         """
         dataset = self.get_dataset(dataset_id)
-        dataset.status = RunStatus.RUNNING
-        dataset.start_time = datetime.now()
+        if dataset.status == RunStatus.RUNNING:
+            # Already running
+            return
+        elif dataset.status == RunStatus.COMPLETE:
+            # Already completed. Can happen due to race conditions
+            raise UserWarning('Cannot mark the completed dataset {} as running'.format(dataset_id))
+        elif dataset.status == RunStatus.PENDING:
+            dataset.status = RunStatus.RUNNING
+            dataset.start_time = datetime.now()
+        else:
+            raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))
 
     @try_with_session(commit=True)
     def mark_dataset_complete(self, dataset_id: int) -> None:
         """
-        Set the status of the dataset to COMPLETE and set the 'end_time' field
-        to the current datetime.
+        Set the status of the dataset to COMPLETE and set the 'end_time' field to the current datetime.
         """
         dataset = self.get_dataset(dataset_id)
-        dataset.status = RunStatus.COMPLETE
-        dataset.end_time = datetime.now()
+        if dataset.status == RunStatus.COMPLETE:
+            # Already completed
+            return
+        elif dataset.status == RunStatus.PENDING:
+            raise UserWarning('Cannot mark the pending dataset {} as completed'.format(dataset_id))
+        elif dataset.status == RunStatus.RUNNING:
+            dataset.status = RunStatus.COMPLETE
+            dataset.end_time = datetime.now()
+        else:
+            raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))

@@ -25,14 +25,13 @@ def _get_core(args) -> Core:
     return Core(**core_args)
 
 
-def _work(args, wait=False):
+def _work(args):
     """Creates a single worker."""
     core = _get_core(args)
 
     core.work(
         choose_randomly=False,
-        # save_files=args.save_files,
-        wait=wait
+        wait=False
     )
 
 
