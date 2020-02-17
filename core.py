@@ -14,7 +14,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from constants import RunStatus
-from data import store_data
+from data import store_data, upload_data
 from database import Database
 from metafeatures import MetaFeatures
 from worker import AlgorithmError, Worker
@@ -83,7 +83,7 @@ class Core(object):
 
         local_file = store_data(df, self.work_dir, name)
         # TODO upload data to S3 bucket via data.upload_data(...)
-        # upload_data(train_path, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
+        # upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
 
         # 3. Metafeatures berechnen
         mf = self.metafeatures.calculate(df=df, class_column=class_column)
@@ -139,6 +139,8 @@ class Core(object):
             """
             Get all pending and running datasets, or all pending/running datasets from the list we were given
             """
+            # datasets_r = self.db.get_datasets(ignore_complete=True, ignore_pending=True)
+            # datasets_p = self.db.get_datasets(ignore_complete=True, ignore_running=True)
             datasets = self.db.get_datasets()
             if not datasets:
                 if wait:
@@ -153,11 +155,15 @@ class Core(object):
             """
             Either choose a dataset randomly between priority, or take the dataset with the lowest ID
             """
+
+            candidates = [d for d in datasets if d.status == RunStatus.RUNNING]
+            if len(candidates) == 0:
+                candidates = datasets
+
             if choose_randomly:
-                # TODO chooses randomly between running and pending data sets. Should finish running datasets first
-                ds = random.choice(datasets)
+                ds = random.choice(candidates)
             else:
-                ds = sorted(datasets, key=attrgetter('id'))[0]
+                ds = sorted(candidates, key=attrgetter('id'))[0]
 
             """
             Mark dataset as RUNNING

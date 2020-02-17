@@ -199,8 +199,6 @@ def load_metrics(algorithm, metrics_dir):
 
 def multiclass_roc_auc_score(y_test, y_pred, average="macro"):
     """
-    # TODO maybe check if multiclass or not. True -> multiclass_roc_auc_score, False -> roc_auc_score
-
     from https://medium.com/@plog397/auc-roc-curve-scoring-function-for-multi-class-classification-9822871a6659
     """
     lb = LabelBinarizer()
@@ -214,8 +212,6 @@ def multiclass_roc_auc_score(y_test, y_pred, average="macro"):
 
 def logloss(y_test, y_pred):
     """
-    # TODO maybe check if multiclass or not. True -> multiclass_roc_auc_score, False -> roc_auc_score
-
     from https://medium.com/@plog397/auc-roc-curve-scoring-function-for-multi-class-classification-9822871a6659
     """
     lb = LabelBinarizer()

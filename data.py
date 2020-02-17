@@ -3,6 +3,7 @@ import os
 from typing import Tuple
 
 import boto3
+import botocore
 import pandas as pd
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
@@ -78,6 +79,16 @@ def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key
         aws_access_key_id=s3_access_key,
         aws_secret_access_key=s3_secret_key,
     )
+
+    # TODO check if bucket already exists. If not create_bucket
+    try:
+        client.head_bucket(Bucket=s3_bucket)
+    except botocore.exceptions.ClientError as e:
+        # If a client error is thrown, then check that it was a 404 error.
+        # If it was a 404 error, then the bucket does not exist.
+        error_code = e.response['Error']['Code']
+        if error_code == '404':
+            client.create_bucket(Bucket=s3_bucket)
 
     if name is None:
         name = input_file.split('/')[-1]

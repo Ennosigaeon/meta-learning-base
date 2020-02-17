@@ -133,7 +133,7 @@ class DatasetConfig(Config):
         'help': 'Path to raw training data',
         'required': True
     }
-    test_path = 'Path to raw test data (if applicable)'
+    test_path = 'Path to raw not working data (if applicable)'
     class_column = {
         'help': 'Column containing class labels',
         'default': 'class'

@@ -1,0 +1,11 @@
+{
+  "name": "ohe",
+  "class": "sklearn.preprocessing.OneHotEncoder",
+  "hyperparameters": {
+
+  },
+  "root_hyperparameters": [
+
+  ],
+  "conditional_hyperparameters": {}
+}

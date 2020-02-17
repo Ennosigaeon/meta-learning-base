@@ -1,0 +1,19 @@
+{
+  "name": "norm",
+  "class": "sklearn.preprocessing.Normalizer",
+  "hyperparameters": {
+    "norm": {
+      "type": "string",
+      "values": [
+        "l1",
+        "l2",
+        "max"
+      ],
+      "default": "l2"
+    }
+  },
+  "root_hyperparameters": [
+    "norm"
+  ],
+  "conditional_hyperparameters": {}
+}

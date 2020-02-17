@@ -1,0 +1,23 @@
+{
+  "name": "pca",
+  "class": "sklearn.decomposition.PCA",
+  "hyperparameters": {
+    "n_components": {
+      "type": "float",
+      "range": [
+        0.5,
+        0.9999
+      ],
+      "default": 0.9999
+    },
+    "whiten": {
+      "type": "bool",
+      "default": false
+    }
+  },
+  "root_hyperparameters": [
+    "n_components",
+    "whiten"
+  ],
+  "conditional_hyperparameters": {}
+}

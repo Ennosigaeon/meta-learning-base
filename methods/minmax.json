@@ -1,0 +1,11 @@
+{
+  "name": "mm",
+  "class": "sklearn.preprocessing.MinMaxScaler",
+  "hyperparameters": {
+
+  },
+  "root_hyperparameters": [
+
+  ],
+  "conditional_hyperparameters": {}
+}

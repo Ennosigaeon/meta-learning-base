@@ -84,7 +84,7 @@ class Dataset(Base):
     class_column = Column(String(100))
 
     train_path = Column(String, nullable=False)
-    status = Column(Enum(*RUN_STATUS))
+    status = Column(String(50), nullable=False)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     processed = Column(Integer)
@@ -158,7 +158,6 @@ class Dataset(Base):
         md5 = hashlib.md5(path.encode('utf-8'))
         return md5.hexdigest()
 
-    # TODO check which parameters are really necessary and delete rest
     def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
                  start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 10,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
@@ -256,7 +255,7 @@ class Algorithm(Base):
     
     """
     algorithm = Column(String(300), nullable=False)
-    status = Column(Enum(*ALGORITHM_STATUS))
+    status = Column(String(50), nullable=False)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     error_message = Column(Text)
@@ -267,7 +266,6 @@ class Algorithm(Base):
     # base 64 encoding of the hyperparameter names and values
     hyperparameter_values_64 = Column(Text)
     accuracy = Column(Numeric(precision=20, scale=10))
-    average_precision = Column(Numeric(precision=20, scale=10))
     f1_score = Column(Numeric(precision=20, scale=10))
     precision = Column(Numeric(precision=20, scale=10))
     recall = Column(Numeric(precision=20, scale=10))
@@ -547,15 +545,14 @@ class Database(object):
         Returns: the ID of the newly-created algorithm
         """
         # TODO for all cases where only a single record is updated: https://stackoverflow.com/a/278606/3447557
-        dataset = self.get_dataset(dataset_id)
-        dataset.processed += 1
+        self.session.query(Dataset).update({Dataset.processed: Dataset.processed + 1})
+        self.session.commit()
         self.session.add(algorithm)
         return algorithm
 
     @try_with_session(commit=True)
-    def complete_algorithm(self, algorithm_id, dataset, accuracy: float = None, av_precision: float = None,
-                           f1: float = None, precision: float = None, recall: float = None, neg_log_loss: float = None,
-                           roc_auc: float = None):
+    def complete_algorithm(self, algorithm_id, accuracy: float = None, f1: float = None, precision: float = None,
+                           recall: float = None, neg_log_loss: float = None, roc_auc: float = None):
         """
         Set all the parameters on a algorithm that haven't yet been set, and mark
         it as complete.
@@ -564,7 +561,6 @@ class Database(object):
         algorithm = self.session.query(Algorithm).get(algorithm_id)
 
         algorithm.accuracy = accuracy
-        algorithm.average_precision = av_precision
         algorithm.f1_score = f1
         algorithm.precision = precision
         algorithm.recall = recall
