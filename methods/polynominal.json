@@ -3,7 +3,7 @@
   "class": "sklearn.preprocessing.PolynomialFeatures",
   "hyperparameters": {
     "degree": {
-      "type": "int",
+      "type": "String",
       "range": [
         2,
         3

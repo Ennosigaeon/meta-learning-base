@@ -172,7 +172,10 @@ class Worker(object):
         started. If there are none it returns False.
 
         Then is_dataset_finished checks if a dataset has enough budget for all the algorithms in the list.
-        If the dataset has run out of budget, is_data_set returns True.
+        If the dataset has run out of budget, is_dataset_finished returns True.
+
+        Last is_dataset_finished checks if a dataset has reached max pipeline depth. If a dataset has reached
+        max pipeline depth, is_dataset_finished returns True.
         """
         algorithms = self.db.get_algorithms(dataset_id=self.dataset.id, ignore_complete=False)
         # No algorithms for this data set started yet

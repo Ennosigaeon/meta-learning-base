@@ -159,7 +159,7 @@ class Dataset(Base):
         return md5.hexdigest()
 
     def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
-                 start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 10,
+                 start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 2, depth: int = 0,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
                  attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
@@ -170,7 +170,7 @@ class Dataset(Base):
                  one_nn_sd=None, best_node_mean=None, best_node_sd=None,
                  linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
                  nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None, pct_inst_mv=None,
-                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None, depth: int = 0):
+                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None,):
         self.train_path = train_path
         self.name = name or self._make_name(train_path)
         self.status = status
@@ -540,23 +540,21 @@ class Database(object):
                          dataset_id: int,
                          algorithm: Algorithm, start_time, status, host,
                          hyperparameter_values: Dict = None) -> Algorithm:
-        """
-        Save a new, fully qualified algorithm object to the database.
-        Returns: the ID of the newly-created algorithm
-        """
-        # TODO for all cases where only a single record is updated: https://stackoverflow.com/a/278606/3447557
-        self.session.query(Dataset).update({Dataset.processed: Dataset.processed + 1})
+
+        """Update dataset values in the db"""
+        self.session.query(Dataset).filter(Dataset.id == dataset_id).update({Dataset.processed: Dataset.processed + 1},
+                                                                            synchronize_session=False)
         self.session.commit()
+
+        """Add algorithm to the db"""
         self.session.add(algorithm)
         return algorithm
 
     @try_with_session(commit=True)
     def complete_algorithm(self, algorithm_id, accuracy: float = None, f1: float = None, precision: float = None,
                            recall: float = None, neg_log_loss: float = None, roc_auc: float = None):
-        """
-        Set all the parameters on a algorithm that haven't yet been set, and mark
-        it as complete.
-        """
+
+        """Set all the parameters on a algorithm that haven't yet been set, and mark it as complete."""
 
         algorithm = self.session.query(Algorithm).get(algorithm_id)
 

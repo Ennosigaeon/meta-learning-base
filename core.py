@@ -67,28 +67,34 @@ class Core(object):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
+                The input dataset.
 
             class_column (str):
+                The class column of the input dataset which is to be predicted.
 
             name (str):
-                Name given to this dataset. Optional. If not given, a hash will be
-                generated from the training_path and used as the Dataset name.
+                Name given to this dataset. Optional. If not given, a random uuid will be
+                generated from the training_path and used as the dataset name.
 
             depth (int):
+                The max pipeline depth a dataset can reach.
 
         """
-
+        """Generate name using a random uuid, if input dataset has no name"""
         if not name or name.strip() == '':
             name = str(uuid.uuid4())
 
+        """Stores input database to local working directory"""
         local_file = store_data(df, self.work_dir, name)
-        # TODO upload data to S3 bucket via data.upload_data(...)
-        # upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
 
-        # 3. Metafeatures berechnen
+        """Uploads input dataset to cloud"""
+        upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
+
+        """Calculates metafeatures for input dataset"""
         mf = self.metafeatures.calculate(df=df, class_column=class_column)
 
-        # 4. Speichern in Datenbank
+        """Saves input dataset and calculated metafeatures in the db"""
+        LOGGER.info('Saving {} to the Database.'.format(local_file))
         return self.db.create_dataset(
             train_path=local_file,
             name=name,
@@ -101,9 +107,10 @@ class Core(object):
         """Add a new algorithm to the Database.
         Args:
             ds_id:
+                ID of the dataset the algorithm was working on.
 
             algorithm:
-
+                The algorithm instance which is to be saved to the db.
 
         Returns:
             Algorithm:
@@ -139,8 +146,6 @@ class Core(object):
             """
             Get all pending and running datasets, or all pending/running datasets from the list we were given
             """
-            # datasets_r = self.db.get_datasets(ignore_complete=True, ignore_pending=True)
-            # datasets_p = self.db.get_datasets(ignore_complete=True, ignore_running=True)
             datasets = self.db.get_datasets()
             if not datasets:
                 if wait:
@@ -152,14 +157,12 @@ class Core(object):
                     LOGGER.info('No datasets found. Exiting.')
                     break
 
-            """
-            Either choose a dataset randomly between priority, or take the dataset with the lowest ID
-            """
-
+            """Take all RUNNING datasets as first priority, then take PENDING"""
             candidates = [d for d in datasets if d.status == RunStatus.RUNNING]
             if len(candidates) == 0:
                 candidates = datasets
 
+            """Either choose a dataset randomly between priority, or take the dataset with the lowest ID"""
             if choose_randomly:
                 ds = random.choice(candidates)
             else:

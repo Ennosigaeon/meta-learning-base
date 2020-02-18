@@ -1,0 +1,29 @@
+{
+  "name": "sp",
+  "class": "sklearn.feature_selection.SelectPercentile",
+  "hyperparameters": {
+    "percentile": {
+      "type": "int",
+      "range": [
+        1,
+        99
+      ],
+      "default": 50
+    },
+    "score_func": {
+      "type": "string",
+      "values": [
+        "chi2",
+        "f_classif",
+        "mutal_info"
+      ],
+      "default": "chi2"
+    }
+  },
+  "root_hyperparameters": [
+    "percentile",
+    "score_func"
+
+  ],
+  "conditional_hyperparameters": {}
+}
