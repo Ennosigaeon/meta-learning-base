@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: usu4867
     volumes:
       - /mnt/data/postgres:/var/lib/postgresql/data
     ports:
@@ -17,7 +17,7 @@ services:
     command: server /data
     environment:
       MINIO_ACCESS_KEY: access_key
-      MINIO_SECRET_KEY: secret_key
+      MINIO_SECRET_KEY: usu4867
     volumes:
       - /mnt/data/minio:/data
     ports:
