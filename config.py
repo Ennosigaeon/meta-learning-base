@@ -136,7 +136,7 @@ class DatasetConfig(Config):
     test_path = 'Path to raw not working data (if applicable)'
     class_column = {
         'help': 'Column containing class labels',
-        'default': 'class'
+        'default': 'Class'
     }
 
 

@@ -1,9 +1,12 @@
-import os
+import random
+from typing import Dict, Type
 
-ALGORITHMS = []
+from automl.components.base import EstimatorComponent
+from automl.components.classification import ClassifierChoice
+from automl.components.data_preprocessing import DataPreprocessorChoice
+from automl.components.feature_preprocessing import FeaturePreprocessorChoice
 
-if len(ALGORITHMS) == 0:
-    directory = os.path.join(os.path.dirname(__file__))
-    for file_name in os.listdir(directory):
-        if file_name.endswith('.json'):
-            ALGORITHMS.append(file_name)
+ALGORITHMS: Dict[str, Type[EstimatorComponent]] = {}
+ALGORITHMS.update(ClassifierChoice().get_components())
+ALGORITHMS.update(DataPreprocessorChoice().get_components())
+ALGORITHMS.update(FeaturePreprocessorChoice().get_components())

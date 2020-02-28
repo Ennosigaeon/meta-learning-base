@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import Optional, Tuple, Dict, TYPE_CHECKING
 
 import pandas as pd
-import numpy as np
 from sklearn.base import BaseEstimator, is_classifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import cross_val_predict
@@ -160,7 +159,8 @@ class Worker(object):
             """Load class_column and join transformed dataset with removed class_column of the input dataset.
             Add transformed dataset to DB"""
             new_dataset = pd.concat([res[0], dataset_class_column], axis=1)
-            depth = self.dataset.depth + 1
+            depth = self.dataset.depth
+            depth += 1
             self.core.add_dataset(new_dataset, class_column, depth=depth)
             LOGGER.info('Transformed dataset will be stored in DB.')
 
@@ -178,6 +178,12 @@ class Worker(object):
         max pipeline depth, is_dataset_finished returns True.
         """
         algorithms = self.db.get_algorithms(dataset_id=self.dataset.id, ignore_complete=False)
+
+        # Dataset has reached max pipeline depth
+        if self.dataset.depth >= self.max_pipeline_depth:
+            LOGGER.info('Dataset {} has reached max pipeline depth!'.format(self.dataset))
+            return True
+
         # No algorithms for this data set started yet
         if not algorithms:
             return False
@@ -186,11 +192,6 @@ class Worker(object):
         n_completed = len(algorithms)
         if n_completed >= self.dataset.budget:
             LOGGER.info('Algorithm budget for dataset {} has run out!'.format(self.dataset))
-            return True
-
-        # Dataset has reached max pipeline depth
-        if self.dataset.depth >= self.max_pipeline_depth:
-            LOGGER.info('Dataset {} has reached max pipeline depth!'.format(self.dataset))
             return True
 
         return False
@@ -219,7 +220,7 @@ class Worker(object):
         """
         try:
             LOGGER.info('Starting new algorithm...')
-            algorithm = Algorithm(random.choice(ALGORITHMS),
+            algorithm = Algorithm(random.choice(list(ALGORITHMS.keys())),
                                   dataset_id=self.dataset.id,
                                   status=AlgorithmStatus.RUNNING,
                                   start_time=datetime.now())
@@ -228,7 +229,7 @@ class Worker(object):
             params = algorithm.random_config()
             algorithm.hyperparameter_values = params
 
-            param_info = 'Chose parameters for algorithm "{}":'.format(algorithm.class_path)
+            param_info = 'Chose parameters for algorithm "{}":'.format(algorithm.hyperparameter_values)
             for k in sorted(params.keys()):
                 param_info += '\n\t{} = {}'.format(k, params[k])
             LOGGER.debug(param_info)

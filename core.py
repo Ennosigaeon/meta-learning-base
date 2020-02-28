@@ -84,7 +84,7 @@ class Core(object):
         if not name or name.strip() == '':
             name = str(uuid.uuid4())
 
-        """Stores input database to local working directory"""
+        """Stores input dataset to local working directory"""
         local_file = store_data(df, self.work_dir, name)
 
         """Uploads input dataset to cloud"""
@@ -92,9 +92,9 @@ class Core(object):
 
         """Calculates metafeatures for input dataset"""
         mf = self.metafeatures.calculate(df=df, class_column=class_column)
-
-        """Saves input dataset and calculated metafeatures in the db"""
-        LOGGER.info('Saving {} to the Database.'.format(local_file))
+        LOGGER.info('Extracted Metafeatures')
+        """Saves input dataset and calculated metafeatures to db"""
+        LOGGER.info('Saving {}'.format(local_file))
         return self.db.create_dataset(
             train_path=local_file,
             name=name,
@@ -184,10 +184,12 @@ class Core(object):
             try:
                 pbar = tqdm(total=ds.budget, ascii=True, initial=ds.processed, disable=not verbose)
 
+                """Creates Worker"""
                 worker = Worker(self.db, ds, self, s3_access_key=self.s3_access_key, s3_secret_key=self.s3_secret_key,
                                 s3_bucket=self.s3_bucket, models_dir=self.models_dir, metrics_dir=self.metrics_dir,
                                 verbose_metrics=self.verbose_metrics)
 
+                """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""
                 while ds.status == RunStatus.RUNNING:
                     worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)

@@ -80,7 +80,7 @@ def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key
         aws_secret_access_key=s3_secret_key,
     )
 
-    # TODO check if bucket already exists. If not create_bucket
+    """Checks if s3_bucket already exists. If not call create_bucket"""
     try:
         client.head_bucket(Bucket=s3_bucket)
     except botocore.exceptions.ClientError as e:
@@ -95,8 +95,9 @@ def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key
     try:
         LOGGER.info('Uploading {}'.format(input_file))
         client.upload_file(input_file, s3_bucket, name)
-
+        LOGGER.debug('1')
         remote_path = "{0}/{1}/{2}".format(s3_endpoint, s3_bucket, name)
+        LOGGER.debug('2')
         local_path = _get_local_path(input_file, name)
 
         # TODO move file from local_file to local_path

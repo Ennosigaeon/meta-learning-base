@@ -1,27 +1,22 @@
 from __future__ import absolute_import, unicode_literals
 
 import hashlib
-import importlib
-import json
-import os
 from builtins import object
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 import numpy as np
 import pymysql
-from ConfigSpace.conditions import InCondition
-from ConfigSpace.configuration_space import ConfigurationSpace, Configuration
-from ConfigSpace.hyperparameters import UniformIntegerHyperparameter, UniformFloatHyperparameter, \
-    CategoricalHyperparameter
+from ConfigSpace.configuration_space import Configuration
 from sklearn.base import BaseEstimator
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, create_engine
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from constants import ALGORITHM_STATUS, AlgorithmStatus, RunStatus, RUN_STATUS
+from constants import AlgorithmStatus, RunStatus
 from data import load_data
+from methods import ALGORITHMS
 from utilities import base_64_to_object, object_to_base_64
 
 
@@ -159,7 +154,7 @@ class Dataset(Base):
         return md5.hexdigest()
 
     def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
-                 start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 2, depth: int = 0,
+                 start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 5, depth: int = 0,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
                  attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
@@ -252,7 +247,7 @@ class Algorithm(Base):
     dataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
 
     """
-    
+    Algorithm columns
     """
     algorithm = Column(String(300), nullable=False)
     status = Column(String(50), nullable=False)
@@ -265,6 +260,10 @@ class Algorithm(Base):
     """
     # base 64 encoding of the hyperparameter names and values
     hyperparameter_values_64 = Column(Text)
+
+    """
+    Performance metrics
+    """
     accuracy = Column(Numeric(precision=20, scale=10))
     f1_score = Column(Numeric(precision=20, scale=10))
     precision = Column(Numeric(precision=20, scale=10))
@@ -272,9 +271,6 @@ class Algorithm(Base):
     neg_log_loss = Column(Numeric(precision=20, scale=10))
     roc_auc_score = Column(Numeric(precision=20, scale=10))
 
-    """
-    Performance metrics
-    """
     cv_judgment_metric = Column(Numeric(precision=20, scale=10))
     cv_judgment_metric_stdev = Column(Numeric(precision=20, scale=10))
     test_judgment_metric = Column(Numeric(precision=20, scale=10))
@@ -284,10 +280,12 @@ class Algorithm(Base):
     """
     host = Column(String)
 
+    """Decode hyperparameters from base64 to object"""
     @property
     def hyperparameter_values(self) -> dict:
         return base_64_to_object(self.hyperparameter_values_64)
 
+    """Encode hyperparameters from object to base64"""
     @hyperparameter_values.setter
     def hyperparameter_values(self, value: Configuration):
         if value is None:
@@ -332,51 +330,7 @@ class Algorithm(Base):
         method: method code or path to JSON file containing all the information
             needed to specify this enumerator.
         """
-        config_path = os.path.join(os.path.dirname(__file__), 'methods', self.algorithm)  # + '.json'
-
-        with open(config_path) as f:
-            config = json.load(f)
-
-        self.root_params = config['root_hyperparameters']
-        self.conditions = config['conditional_hyperparameters']
-        self.class_path = config['class']
-
-        # create hyperparameters from the parameter config
-        cs = ConfigurationSpace()
-
-        self.parameters = {}
-        for k, v in list(config['hyperparameters'].items()):
-            param_type = v['type']
-            if param_type == 'int':
-                self.parameters[k] = UniformIntegerHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
-                                                                  default_value=v.get('default', None))
-            elif param_type == 'int_exp':
-                self.parameters[k] = UniformIntegerHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
-                                                                  default_value=v.get('default', None), log=True)
-            elif param_type == 'float':
-                self.parameters[k] = UniformFloatHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
-                                                                default_value=v.get('default', None))
-            elif param_type == 'float_exp':
-                self.parameters[k] = UniformFloatHyperparameter(k, lower=v['range'][0], upper=v['range'][1],
-                                                                default_value=v.get('default', None), log=True)
-            elif param_type == 'string':
-                # noinspection PyArgumentList
-                self.parameters[k] = CategoricalHyperparameter(k, choices=v['values'],
-                                                               default_value=v.get('default', None))
-            elif param_type == 'bool':
-                # noinspection PyArgumentList
-                self.parameters[k] = CategoricalHyperparameter(k, choices=[True, False],
-                                                               default_value=v.get('default', None))
-            else:
-                raise ValueError(f'Unknown hyperparameter type {param_type}')
-
-        # noinspection PyTypeChecker
-        cs.add_hyperparameters(self.parameters.values())
-
-        for condition, dic in self.conditions.items():
-            for k, v in dic.items():
-                cs.add_condition(InCondition(self.parameters[k], self.parameters[condition], v))
-
+        cs = ALGORITHMS[self.algorithm].get_hyperparameter_search_space()
         self.cs = cs
 
     def random_config(self):
@@ -392,12 +346,7 @@ class Algorithm(Base):
             else:
                 params = self.hyperparameter_values
 
-        module_name = self.class_path.rpartition(".")[0]
-        class_name = self.class_path.split(".")[-1]
-
-        module = importlib.import_module(module_name)
-        class_ = getattr(module, class_name)
-        return class_(**params)
+        return ALGORITHMS[self.algorithm](**params)
 
     def __repr__(self):
         params = '\n'.join(
