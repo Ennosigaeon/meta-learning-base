@@ -1,4 +1,3 @@
-import random
 from typing import Dict, Type
 
 from automl.components.base import EstimatorComponent
