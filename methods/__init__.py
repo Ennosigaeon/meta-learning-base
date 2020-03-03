@@ -1,5 +1,7 @@
 from typing import Dict, Type
 
+import automl
+
 from automl.components.base import EstimatorComponent
 from automl.components.classification import ClassifierChoice
 from automl.components.data_preprocessing import DataPreprocessorChoice
