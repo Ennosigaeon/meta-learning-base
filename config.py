@@ -176,6 +176,7 @@ class GenericConfig(Config):
 
     work_dir = {
         'help': 'Path to data location',
-        'default': '/vagrant/data/',
+        # 'default': '/vagrant/data/',  # local
+        'default': '/home/dfloor/data/',  # gcloud
         'required': False
     }
