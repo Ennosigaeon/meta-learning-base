@@ -40,7 +40,12 @@ def _enter_data(args):
     dataset_conf = DatasetConfig(args)
 
     df = load_data(dataset_conf.train_path)
-    df = df.replace({'?': None})
+
+    try:
+        df = df.replace({'?': None})
+    except:
+        pass
+
     class_column = dataset_conf.class_column
 
     dataset = core.add_dataset(df, class_column, 0, dataset_conf.name)
