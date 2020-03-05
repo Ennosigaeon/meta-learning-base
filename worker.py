@@ -12,6 +12,7 @@ from sklearn.base import BaseEstimator, is_classifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import cross_val_predict
 
+from data import delete_data
 from constants import AlgorithmStatus
 from database import Database, Algorithm
 from methods import ALGORITHMS
@@ -209,10 +210,13 @@ class Worker(object):
         """
         if self.is_dataset_finished():
             """
-            Mark the run as done successfully
+            Mark the run as done successfully and remove the completed dataset from local storage.
             """
             self.db.mark_dataset_complete(self.dataset.id)
             LOGGER.info('Dataset {} has been marked as complete.'.format(self.dataset))
+
+            delete_data(self.dataset.train_path)
+            LOGGER.info('Complete dataset {} has been removed from local storage.'.format(self.dataset))
             return
 
         """

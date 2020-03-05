@@ -71,6 +71,13 @@ def store_data(df: pd.DataFrame, work_dir: str, name: str, format: str = 'csv') 
         raise ValueError('Format \'{}\' currently not supported'.format(format))
 
 
+def delete_data(train_path: str):
+    if os.path.exists(train_path):
+        os.remove(train_path)
+    else:
+        LOGGER.info('Dataset does not exist in local storage.')
+
+
 def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,
                 name: str = None) -> Tuple[str, str]:
     client: BaseClient = boto3.client(

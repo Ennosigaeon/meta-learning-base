@@ -15,7 +15,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from constants import AlgorithmStatus, RunStatus
-from data import load_data
+from data import load_data, delete_data
 from methods import ALGORITHMS
 from utilities import base_64_to_object, object_to_base_64
 

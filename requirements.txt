@@ -1,3 +1,12 @@
+pymfe
+botocore
+boto3
+sqlalchemy
+scikit-learn
+ConfigSpace
+pymysql
+numpy
+pandas
 scipy 1.2.1
 pymfe 0.1.0
 ConfigSpace 0.4.9

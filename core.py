@@ -88,7 +88,7 @@ class Core(object):
         local_file = store_data(df, self.work_dir, name)
 
         """Uploads input dataset to cloud"""
-        # upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
+        upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
 
         """Calculates metafeatures for input dataset"""
         mf = self.metafeatures.calculate(df=df, class_column=class_column)
