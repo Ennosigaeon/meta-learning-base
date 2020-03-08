@@ -97,6 +97,12 @@ def delete_data(train_path: str):
 
 def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,
                 name: str = None) -> Tuple[str, str]:
+    local_path = _get_local_path(input_file, name)
+
+    # S3 Storage is disabled
+    if s3_endpoint is None or s3_bucket is None or s3_secret_key is None or s3_access_key is None:
+        return local_path, local_path
+
     client: BaseClient = boto3.client(
         's3',
         endpoint_url=s3_endpoint,
@@ -123,7 +129,6 @@ def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key
         remote_path = "{0}/{1}/{2}".format(s3_endpoint, s3_bucket, name)
         LOGGER.debug('2')
         local_path = _get_local_path(input_file, name)
-
         # TODO move file from local_file to local_path
         return local_path, remote_path
     except ClientError as e:
