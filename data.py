@@ -17,10 +17,12 @@ WORK_DIR = 'data'
 
 
 def _get_local_path(path: str, name: str = None) -> str:
+    file_type = '.parquet'
+
     if name is None:
         name = path.split('/')[-1]
-    if not name.endswith('csv'):
-        name = name + '.csv'
+    if not name.endswith(file_type):
+        name = name + file_type
 
     cwd = os.getcwd()
     data_path = os.path.join(cwd, WORK_DIR)
@@ -74,20 +76,16 @@ def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
                 LOGGER.error('An error occurred trying to download from AWS3.'
                              'The following error has been returned: {}'.format(e))
 
-    return pd.read_csv(path)
+    return pd.read_parquet(path)
 
 
-def store_data(df: pd.DataFrame, work_dir: str, name: str, format: str = 'csv') -> str:
+def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
     # TODO what if folder does not exist?
     # TODO what if name already exists?
-    path = os.path.join(work_dir, name)
-
-    if format == 'csv':
-        path += '.csv'
-        df.to_csv(path_or_buf=path, header=True, index=False)
-        return path
-    else:
-        raise ValueError('Format \'{}\' currently not supported'.format(format))
+    # TODO what if disk is full?
+    path = os.path.join(work_dir, name) + '.parquet'
+    df.to_parquet(path)
+    return path
 
 
 def delete_data(train_path: str):
