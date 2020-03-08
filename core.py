@@ -6,6 +6,8 @@ executing and orchestrating the main Core functionalities.
 
 import logging
 import random
+
+import signal
 import time
 import uuid
 from operator import attrgetter
@@ -62,6 +64,7 @@ class Core(object):
         self.models_dir: str = models_dir
         self.metrics_dir: str = metrics_dir
         self.verbose_metrics: bool = verbose_metrics
+        self._abort = False
 
     def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, name: str = None):
         """Add a new dataset to the Database.
@@ -138,11 +141,21 @@ class Core(object):
                 Whether to be verbose about the process. Optional. Defaults to ``True``.
         """
 
+        def user_abort(signalNumer, frame):
+            LOGGER.info('Received abort signal. Stopping processing after current evaluation...')
+            self._abort = True
+
+        signal.signal(signal.SIGUSR1, user_abort)
+
         # ##########################################################################
         # #  Main Loop  ############################################################
         # ##########################################################################
 
         while True:
+            if self._abort:
+                LOGGER.info("Stopping processing due to user request")
+                break
+
             """
             Get all pending and running datasets, or all pending/running datasets from the list we were given
             """
