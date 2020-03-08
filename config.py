@@ -131,9 +131,10 @@ class DatasetConfig(Config):
     name = 'Given name for this dataset.'
     train_path = {
         'help': 'Path to raw training data',
-        'required': True
     }
-    test_path = 'Path to raw not working data (if applicable)'
+    openml = {
+        'help': 'Flag whether this dataset is stored in OpenML',
+    }
     class_column = {
         'help': 'Column containing class labels',
         'default': 'Class'

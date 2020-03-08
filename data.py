@@ -1,12 +1,15 @@
 import logging
 import os
-from typing import Tuple
 
 import boto3
 import botocore
+import openml
 import pandas as pd
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
+from typing import Tuple
+
+from config import DatasetConfig
 
 LOGGER = logging.getLogger('mlb')
 
@@ -26,6 +29,22 @@ def _get_local_path(path: str, name: str = None) -> str:
         os.makedirs(data_path)
 
     return os.path.join(data_path, name)
+
+
+def load_openml(dataset_conf: DatasetConfig) -> pd.DataFrame:
+    ds = openml.datasets.get_dataset(dataset_conf.openml)
+    X, y, categorical_indicator, attribute_names = ds.get_data(
+        dataset_format='dataframe',
+        target=ds.default_target_attribute
+    )
+    df = pd.concat([X, y], axis=1)
+
+    # Fix configuration
+    dataset_conf.format = ds.format
+    dataset_conf.class_column = ds.default_target_attribute
+    dataset_conf.name = ds.name + '_' + dataset_conf.openml
+
+    return df
 
 
 def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,

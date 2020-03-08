@@ -1,11 +1,12 @@
 """Command Line Interfaced module."""
 
-import argparse
 import logging
+
+import argparse
 
 from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig
 from core import Core
-from data import load_data
+from data import load_data, load_openml
 
 LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +40,12 @@ def _enter_data(args):
     core = _get_core(args)
     dataset_conf = DatasetConfig(args)
 
-    df = load_data(dataset_conf.train_path)
+    if dataset_conf.openml is not None:
+        df = load_openml(dataset_conf)
+    elif dataset_conf.train_path is not None:
+        df = load_data(dataset_conf.train_path)
+    else:
+        raise ValueError('Neither --openml nor --trainpath given.')
 
     try:
         df = df.replace({'?': None})

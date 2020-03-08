@@ -1,3 +1,4 @@
+# TODO: syntax is wrong scipy==1.2.1
 pymfe
 botocore
 boto3
@@ -21,3 +22,5 @@ pymysql 0.9.3
 pandas 0.24.2
 numpy 1.16.2
 psycopg2 2.7.7
+pyarrow
+openml
