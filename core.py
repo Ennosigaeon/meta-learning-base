@@ -83,6 +83,13 @@ class Core(object):
                 The max pipeline depth a dataset can reach.
 
         """
+        # TODO validate if dataset already exists
+        # 1. Calculate hash of dataframe
+        # 2. Compare hash with database
+        # 3. Load all datasets with same hash
+        # 4. Do values-based comparision
+        # 5. If dataset already exists skip it
+
         """Generate name using a random uuid, if input dataset has no name"""
         if not name or name.strip() == '':
             name = str(uuid.uuid4())

@@ -71,6 +71,8 @@ Base = declarative_base()
 class Dataset(Base):
     __tablename__ = 'datasets'
 
+    # TODO set index on appropriate columns
+
     """
     Columns necessary for loading/processing data
     """
