@@ -103,7 +103,8 @@ def _get_parser():
         worker_args,
         sql_args,
         s3_args,
-        log_args
+        log_args,
+        generic_args
     ]
     worker = subparsers.add_parser('worker', parents=worker_parents,
                                    help='Start a single worker in foreground.')
