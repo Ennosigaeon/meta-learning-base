@@ -206,7 +206,9 @@ class MetaFeatures(object):
                   random_state=random_state)
 
         # noinspection PyTypeChecker
-        mfe.fit(X.values, y.values)
+        # TODO pymfe seems to be unable to handle missing values
+        # Example dataset: https://www.openml.org/d/24
+        mfe.fit(X.to_numpy(), y.to_numpy())
 
         f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 

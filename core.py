@@ -94,7 +94,11 @@ class Core(object):
         upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
 
         """Calculates metafeatures for input dataset"""
-        mf = self.metafeatures.calculate(df=df, class_column=class_column)
+        try:
+            mf = self.metafeatures.calculate(df=df, class_column=class_column)
+        except ValueError as ex:
+            LOGGER.exception('Failed to compute meta-features. Fallback to empty meta-features', ex)
+            mf = {}
         LOGGER.info('Extracted Metafeatures')
         """Saves input dataset and calculated metafeatures to db"""
         LOGGER.info('Saving {}'.format(local_file))
