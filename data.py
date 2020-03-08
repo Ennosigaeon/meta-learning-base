@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 import boto3
 import botocore
@@ -44,7 +45,7 @@ def load_openml(dataset_conf: DatasetConfig) -> pd.DataFrame:
     # Fix configuration
     dataset_conf.format = ds.format
     dataset_conf.class_column = ds.default_target_attribute
-    dataset_conf.name = ds.name + '_' + dataset_conf.openml
+    dataset_conf.name = '{}_{}_{}'.format(ds.name, dataset_conf.openml, time.time())
 
     return df
 
@@ -80,9 +81,12 @@ def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
 
 
 def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
-    # TODO what if folder does not exist?
     # TODO what if name already exists?
-    # TODO what if disk is full?
+    # TODO what if disk is full? python-diskcache
+    if not os.path.isdir(work_dir):
+        LOGGER.info('Creating work directory \'{}\''.format(work_dir))
+        os.mkdir(work_dir)
+
     path = os.path.join(work_dir, name) + '.parquet'
     df.to_parquet(path)
     return path
