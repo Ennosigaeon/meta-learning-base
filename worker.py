@@ -1,5 +1,7 @@
 import logging
 import random
+
+import pynisher2
 import socket
 import traceback
 import warnings
@@ -37,7 +39,7 @@ class Worker(object):
                  database: Database,
                  dataset,
                  core,
-                 cloud_mode: bool = False,
+                 timeout: int = None,
                  s3_access_key: str = None,
                  s3_secret_key: str = None,
                  s3_bucket: str = None,
@@ -50,7 +52,7 @@ class Worker(object):
         self.db = database
         self.dataset = dataset
         self.core: Core = core
-        self.cloud_mode = cloud_mode
+        self.timeout = timeout
 
         self.s3_access_key = s3_access_key
         self.s3_secret_key = s3_secret_key
@@ -258,15 +260,29 @@ class Worker(object):
         """
         try:
             LOGGER.debug('Testing algorithm...')
-            res = self.transform_dataset(algorithm.instance(params))
 
-            LOGGER.debug('Saving algorithm...')
-            self.save_algorithm(algorithm.id, res)
+            wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout)(self.transform_dataset)
+            res = wrapper(algorithm.instance(params))
 
-        except Exception as ex:
-            if isinstance(ex, KeyboardInterrupt):
-                raise ex
+            if wrapper.exit_status is pynisher2.TimeoutException:
+                raise TimeoutError('')
+            elif wrapper.exit_status is pynisher2.MemorylimitException:
+                raise MemoryError('')
+            elif wrapper.exit_status is pynisher2.AnythingException:
+                raise pynisher2.AnythingException(res[1])
+            elif wrapper.exit_status == 0 and res is not None:
+                LOGGER.debug('Saving algorithm...')
+                self.save_algorithm(algorithm.id, res)
+            else:
+                raise ValueError('Something went wrong transforming data set {}; {}'.format(res, wrapper))
+
+        except KeyboardInterrupt:
+            raise
+        except (TimeoutError, MemoryError, pynisher2.AnythingException) as ex:
+            msg = str(ex)
+            LOGGER.warning('Failed to test algorithm: dataset={}\n{}'.format(self.dataset, msg))
+            self.db.mark_algorithm_errored(algorithm.id, error_message=msg)
+        except Exception:
             msg = traceback.format_exc()
-            LOGGER.error('Error testing algorithm: dataset={}'.format(self.dataset))
-            LOGGER.error(msg)
+            LOGGER.error('Unexpected error testing algorithm: dataset={}\n{}'.format(self.dataset, msg))
             self.db.mark_algorithm_errored(algorithm.id, error_message=msg)

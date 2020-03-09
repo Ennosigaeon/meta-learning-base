@@ -41,6 +41,7 @@ class Core(object):
 
             # Generic Conf,
             work_dir: str = None,
+            timeout: int = None,
 
             # S3 Conf
             endpoint: str = None,
@@ -56,6 +57,7 @@ class Core(object):
         self.metafeatures = MetaFeatures()
         self.db = Database(dialect, database, username, password, host, port, query)
         self.work_dir = work_dir
+        self.timeout = timeout
         self.s3_endpoint: str = endpoint
         self.s3_bucket: str = bucket
         self.s3_access_key: str = access_key
@@ -209,9 +211,9 @@ class Core(object):
                 pbar = tqdm(total=ds.budget, ascii=True, initial=ds.processed, disable=not verbose)
 
                 """Creates Worker"""
-                worker = Worker(self.db, ds, self, s3_access_key=self.s3_access_key, s3_secret_key=self.s3_secret_key,
-                                s3_bucket=self.s3_bucket, models_dir=self.models_dir, metrics_dir=self.metrics_dir,
-                                verbose_metrics=self.verbose_metrics)
+                worker = Worker(self.db, ds, self, timeout=self.timeout, s3_access_key=self.s3_access_key,
+                                s3_secret_key=self.s3_secret_key, s3_bucket=self.s3_bucket, models_dir=self.models_dir,
+                                metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
 
                 """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""
                 while ds.status == RunStatus.RUNNING:
