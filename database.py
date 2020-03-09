@@ -87,6 +87,7 @@ class Dataset(Base):
     processed = Column(Integer)
     budget = Column(Integer)
     depth = Column(Integer)
+    hashcode = Column(String(40), index=True)
 
     """
     Metadata columns
@@ -147,8 +148,8 @@ class Dataset(Base):
     naive_bayes_mean = Column(Numeric)
     naive_bayes_sd = Column(Numeric)
 
-    def load(self, aws_access_key=None, aws_secret_key=None):
-        return load_data(self.train_path, aws_access_key, aws_secret_key, self.name)
+    def load(self, s3_endpoint: str = None, s3_bucket: str = None, s3_access_key=None, s3_secret_key=None):
+        return load_data(self.train_path, s3_endpoint, s3_bucket, s3_access_key, s3_secret_key, self.name)
 
     @staticmethod
     def _make_name(path):
@@ -157,6 +158,7 @@ class Dataset(Base):
 
     def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
                  start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 5, depth: int = 0,
+                 hashcode: str = None,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
                  attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
@@ -178,6 +180,7 @@ class Dataset(Base):
         self.budget: Optional[int] = budget
         self.class_column = class_column
         self.depth: int = depth
+        self.hashcode: str = hashcode
 
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
@@ -411,7 +414,7 @@ class Database(object):
     # ##########################################################################
 
     @try_with_session()
-    def get_dataset(self, dataset_id):
+    def get_dataset(self, dataset_id) -> Dataset:
         """ Get a specific dataset. """
         return self.session.query(Dataset).get(dataset_id)
 
@@ -443,7 +446,12 @@ class Database(object):
         return datasets
 
     @try_with_session()
-    def get_algorithm(self, algorithm_id):
+    def get_dataset_by_hash(self, hashcode: str) -> List[Dataset]:
+        """ Get a specific dataset. """
+        return self.session.query(Dataset).filter(Dataset.hashcode == hashcode).all()
+
+    @try_with_session()
+    def get_algorithm(self, algorithm_id) -> Algorithm:
         """ Get a specific algorithm. """
         return self.session.query(Algorithm).get(algorithm_id)
 
@@ -481,7 +489,7 @@ class Database(object):
     # ##########################################################################
 
     @try_with_session(commit=True)
-    def create_dataset(self, **kwargs):
+    def create_dataset(self, **kwargs) -> Dataset:
         dataset = Dataset(**kwargs)
         self.session.add(dataset)
         return dataset

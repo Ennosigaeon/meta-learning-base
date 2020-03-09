@@ -40,6 +40,7 @@ class Worker(object):
                  dataset,
                  core,
                  timeout: int = None,
+                 s3_endpoint: str = None,
                  s3_access_key: str = None,
                  s3_secret_key: str = None,
                  s3_bucket: str = None,
@@ -54,6 +55,7 @@ class Worker(object):
         self.core: Core = core
         self.timeout = timeout
 
+        self.s3_endpoint = s3_endpoint
         self.s3_access_key = s3_access_key
         self.s3_secret_key = s3_secret_key
         self.s3_bucket = s3_bucket
@@ -78,7 +80,7 @@ class Worker(object):
         """
 
         """Load input dataset and class_column"""
-        df = self.dataset.load()
+        df = self.dataset.load(self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
         class_column = self.dataset.class_column
 
         """Split input dataset in X and y"""

@@ -37,6 +37,17 @@ def hash_string(s):
     return hashlib.md5(str(s).encode('utf8')).hexdigest()
 
 
+def hash_file(fname: str, buf_size: int = 1048576):
+    sha1 = hashlib.sha1()
+
+    with open(fname, 'rb') as f:
+        while True:
+            data = f.read(buf_size)
+            if not data:
+                break
+            sha1.update(data)
+    return sha1.hexdigest()
+
 def ensure_directory(directory):
     """ Create directory if it doesn't exist. """
     if not os.path.exists(directory):

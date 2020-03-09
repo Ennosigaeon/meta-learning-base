@@ -14,12 +14,15 @@ from operator import attrgetter
 
 import pandas as pd
 from tqdm import tqdm
+from typing import List
 
 from constants import RunStatus
 from data import store_data, upload_data
-from database import Database
+from database import Database, Dataset
 from metafeatures import MetaFeatures
+from utilities import hash_file
 from worker import AlgorithmError, Worker
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -99,6 +102,15 @@ class Core(object):
         """Stores input dataset to local working directory"""
         local_file = store_data(df, self.work_dir, name)
 
+        """Check if new dataset equals existing dataset. If False store transformed dataset to DB"""
+        hashcode = hash_file(local_file)
+        similar_datasets: List[Dataset] = self.db.get_dataset_by_hash(hashcode)
+        for ds in similar_datasets:
+            df = ds.load(self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
+            if df.equals(ds):
+                LOGGER.info('Transformed dataset equals dataset {} and is not stored in the DB.'.format(ds.id))
+                return ds
+
         """Uploads input dataset to cloud"""
         upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
 
@@ -116,6 +128,7 @@ class Core(object):
             name=name,
             class_column=class_column,
             depth=depth,
+            hashcode=hashcode,
             **mf
         )
 

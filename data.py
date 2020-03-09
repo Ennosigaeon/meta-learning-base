@@ -50,7 +50,7 @@ def load_openml(dataset_conf: DatasetConfig) -> pd.DataFrame:
     return df
 
 
-def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
+def load_data(path: str, s3_endpoint: str = None, s3_bucket: str = None, s3_access_key: str = None,
               s3_secret_key: str = None, name: str = None) -> pd.DataFrame:
     if not os.path.isfile(path):
         local_path = _get_local_path(path, name)
@@ -66,12 +66,9 @@ def load_data(path: str, s3_endpoint: str = None, s3_access_key: str = None,
                 aws_secret_access_key=s3_secret_key,
             )
 
-            bucket = path.split('/')[2]
-            file_to_download = path.replace('s3://{}/'.format(bucket), '')
-
             try:
                 LOGGER.info('Downloading {}'.format(path))
-                client.download_file(bucket, file_to_download, local_path)
+                client.download_file(s3_bucket, path, local_path)
                 path = local_path
             except ClientError as e:
                 LOGGER.error('An error occurred trying to download from AWS3.'
@@ -133,7 +130,6 @@ def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key
         remote_path = "{0}/{1}/{2}".format(s3_endpoint, s3_bucket, name)
         LOGGER.debug('2')
         local_path = _get_local_path(input_file, name)
-        # TODO move file from local_file to local_path
         return local_path, remote_path
     except ClientError as e:
         LOGGER.error('An error occurred trying to upload to AWS3.'
