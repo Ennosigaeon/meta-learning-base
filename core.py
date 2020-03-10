@@ -106,9 +106,9 @@ class Core(object):
         hashcode = hash_file(local_file)
         similar_datasets: List[Dataset] = self.db.get_dataset_by_hash(hashcode)
         for ds in similar_datasets:
-            df = ds.load(self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
-            if df.equals(ds):
-                LOGGER.info('Transformed dataset equals dataset {} and is not stored in the DB.'.format(ds.id))
+            df_old = ds.load(self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
+            if df.equals(df_old):
+                LOGGER.info('New dataset equals dataset {} and is not stored in the DB.'.format(ds.id))
                 return ds
 
         """Uploads input dataset to cloud"""
