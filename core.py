@@ -122,24 +122,6 @@ class Core(object):
             **mf
         )
 
-    def add_algorithm(self, ds_id: int, algorithm: str):
-        """Add a new algorithm to the Database.
-        Args:
-            ds_id:
-                ID of the dataset the algorithm was working on.
-
-            algorithm:
-                The algorithm instance which is to be saved to the db.
-
-        Returns:
-            Algorithm:
-                The created algorithm.
-        """
-        return self.db.create_algorithm(
-            dataset_id=ds_id,
-            algorithm=algorithm
-        )
-
     def work(self, choose_randomly=True, wait=True, verbose=False):
         """Get unfinished Datasets from the database and work on them.
 
@@ -157,7 +139,8 @@ class Core(object):
                 Whether to be verbose about the process. Optional. Defaults to ``True``.
         """
 
-        def user_abort(signalNumer, frame):
+        # noinspection PyUnusedLocal
+        def user_abort(signal_number, frame):
             LOGGER.info('Received abort signal. Stopping processing after current evaluation...')
             self._abort = True
 

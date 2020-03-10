@@ -1,24 +1,24 @@
 import logging
 import random
-
-import pynisher2
-import socket
 import traceback
 import warnings
+
+import numpy as np
+import pandas as pd
+import pynisher2
+import socket
 from builtins import object, str
 from datetime import datetime
-from typing import Optional, Tuple, Dict, TYPE_CHECKING
-
-import pandas as pd
 from sklearn.base import BaseEstimator, is_classifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import cross_val_predict
+from typing import Optional, Tuple, Dict, TYPE_CHECKING
 
-from data import delete_data
 from constants import AlgorithmStatus
+from data import delete_data
 from database import Database, Algorithm
 from methods import ALGORITHMS
-from utilities import ensure_directory, multiclass_roc_auc_score, logloss
+from utilities import multiclass_roc_auc_score, logloss
 
 if TYPE_CHECKING:
     from core import Core
@@ -44,8 +44,6 @@ class Worker(object):
                  s3_access_key: str = None,
                  s3_secret_key: str = None,
                  s3_bucket: str = None,
-                 models_dir: str = 'models',
-                 metrics_dir: str = 'metrics',
 
                  max_pipeline_depth: int = 5,
                  verbose_metrics: bool = False):
@@ -60,13 +58,8 @@ class Worker(object):
         self.s3_secret_key = s3_secret_key
         self.s3_bucket = s3_bucket
 
-        self.models_dir = models_dir
-        self.metrics_dir = metrics_dir
-
         self.max_pipeline_depth = max_pipeline_depth
         self.verbose_metrics = verbose_metrics
-        ensure_directory(self.models_dir)
-        ensure_directory(self.metrics_dir)
 
         """
         Load the Dataset from the database
@@ -156,7 +149,7 @@ class Worker(object):
         # --> gibt bei pandas nur .equals und .assert_frame_equal
 
         """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
-        if res[0].equals(input_df):
+        if np.allclose(res[0].to_numpy(), input_df.to_numpy()):
             LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
                         .format(self.dataset.id))
 
@@ -231,7 +224,8 @@ class Worker(object):
             algorithm = Algorithm(random.choice(list(ALGORITHMS.keys())),
                                   dataset_id=self.dataset.id,
                                   status=AlgorithmStatus.RUNNING,
-                                  start_time=datetime.now())
+                                  start_time=datetime.now(),
+                                  host=HOSTNAME)
 
             """Save a random configuration of the algorithms hyperparameters in params"""
             params = algorithm.random_config()
@@ -252,10 +246,7 @@ class Worker(object):
         Create the algorithm and add it to the database
         """
         algorithm = self.db.create_algorithm(dataset_id=self.dataset.id,
-                                             host=HOSTNAME,
-                                             algorithm=algorithm,
-                                             start_time=algorithm.start_time,
-                                             status=algorithm.status)
+                                             algorithm=algorithm)
 
         """
         Transform the dataset and save the algorithm

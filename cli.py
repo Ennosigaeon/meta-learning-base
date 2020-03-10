@@ -47,11 +47,6 @@ def _enter_data(args):
     else:
         raise ValueError('Neither --openml nor --trainpath given.')
 
-    try:
-        df = df.replace({'?': None})
-    except:
-        pass
-
     class_column = dataset_conf.class_column
 
     dataset = core.add_dataset(df, class_column, 0, dataset_conf.name)

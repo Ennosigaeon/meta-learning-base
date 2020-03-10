@@ -1,21 +1,21 @@
 from __future__ import absolute_import, unicode_literals
 
 import hashlib
-from builtins import object
-from datetime import datetime
-from typing import Optional, List, Dict, Any
 
 import numpy as np
 import pymysql
 from ConfigSpace.configuration_space import Configuration
+from builtins import object
+from datetime import datetime
 from sklearn.base import BaseEstimator
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from typing import Optional, List, Dict, Any
 
 from constants import AlgorithmStatus, RunStatus
-from data import load_data, delete_data
+from data import load_data
 from methods import ALGORITHMS
 from utilities import base_64_to_object, object_to_base_64
 
@@ -157,8 +157,8 @@ class Dataset(Base):
         return md5.hexdigest()
 
     def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
-                 start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 5, depth: int = 0,
-                 hashcode: str = None,
+                 start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 5,
+                 depth: int = 0, hashcode: str = None,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
                  attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
@@ -351,6 +351,8 @@ class Algorithm(Base):
             else:
                 params = self.hyperparameter_values
 
+        # noinspection PyTypeChecker
+        # EstimatorComponent inherits from BaseEstimator
         return ALGORITHMS[self.algorithm](**params)
 
     def __repr__(self):
@@ -463,6 +465,7 @@ class Database(object):
         Get a list of all algorithms matching the chosen filters.
 
         Args:
+            dataset_id:
             ignore_errored: if True, ignore algorithms that are errored
             ignore_running: if True, ignore algorithms that are already running
             ignore_complete: if True, ignore completed algorithms
@@ -495,11 +498,7 @@ class Database(object):
         return dataset
 
     @try_with_session(commit=True)
-    def create_algorithm(self,
-                         dataset_id: int,
-                         algorithm: Algorithm, start_time, status, host,
-                         hyperparameter_values: Dict = None) -> Algorithm:
-
+    def create_algorithm(self, dataset_id: int, algorithm: Algorithm) -> Algorithm:
         """Update dataset values in the db"""
         self.session.query(Dataset).filter(Dataset.id == dataset_id).update({Dataset.processed: Dataset.processed + 1},
                                                                             synchronize_session=False)

@@ -1,5 +1,7 @@
 # TODO: syntax is wrong scipy==1.2.1
 pynisher2==0.5.0
+tqdm
+PyYAML
 pymfe
 botocore
 boto3

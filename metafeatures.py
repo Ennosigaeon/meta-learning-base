@@ -185,7 +185,8 @@ class ClassProbabilitySTD(MetaFeature):
 
 class MetaFeatures(object):
 
-    def calculate(self, df: pd.DataFrame, class_column: str, random_state: int = 42):
+    @staticmethod
+    def calculate(df: pd.DataFrame, class_column: str, random_state: int = 42):
         # ##########################################################################
         # #  Extracting Meta Features with pymfe  ##################################
         # ##########################################################################
