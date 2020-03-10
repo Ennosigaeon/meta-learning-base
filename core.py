@@ -127,6 +127,10 @@ class Core(object):
             **mf
         )
 
+    def _user_abort(self):
+        LOGGER.info('Received abort signal. Stopping processing after current evaluation...')
+        self._abort = True
+
     def work(self, choose_randomly=True, wait=True, verbose=False):
         """Get unfinished Datasets from the database and work on them.
 
@@ -143,13 +147,7 @@ class Core(object):
             verbose (bool):
                 Whether to be verbose about the process. Optional. Defaults to ``True``.
         """
-
-        # noinspection PyUnusedLocal
-        def user_abort(signal_number, frame):
-            LOGGER.info('Received abort signal. Stopping processing after current evaluation...')
-            self._abort = True
-
-        signal.signal(signal.SIGUSR1, user_abort)
+        signal.signal(signal.SIGUSR1, lambda signal, frame: self._user_abort())
 
         # ##########################################################################
         # #  Main Loop  ############################################################
