@@ -149,7 +149,8 @@ class Worker(object):
         # --> gibt bei pandas nur .equals und .assert_frame_equal
 
         """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
-        if np.allclose(res[0].to_numpy(), input_df.to_numpy()):
+        # noinspection PyTypeChecker
+        if np.allclose(res[0].to_numpy(dtype=float), input_df.to_numpy()):
             LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
                         .format(self.dataset.id))
 
