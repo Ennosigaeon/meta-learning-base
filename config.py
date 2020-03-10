@@ -180,7 +180,7 @@ class GenericConfig(Config):
         # 'default': '/vagrant/data/',  # local
         'default': '/data/disk1/',  # gcloud
         'required': False
-    },
+    }
     timeout = {
         'help': 'Time in seconds to execute a single algorithm',
         'default': 7200,

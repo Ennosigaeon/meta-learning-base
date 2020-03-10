@@ -224,8 +224,9 @@ class Core(object):
                 pbar = tqdm(total=ds.budget, ascii=True, initial=ds.processed, disable=not verbose)
 
                 """Creates Worker"""
-                worker = Worker(self.db, ds, self, timeout=self.timeout, s3_access_key=self.s3_access_key,
-                                s3_secret_key=self.s3_secret_key, s3_bucket=self.s3_bucket, models_dir=self.models_dir,
+                worker = Worker(self.db, ds, self, timeout=self.timeout, s3_endpoint=self.s3_endpoint,
+                                s3_access_key=self.s3_access_key, s3_secret_key=self.s3_secret_key,
+                                s3_bucket=self.s3_bucket,  models_dir=self.models_dir,
                                 metrics_dir=self.metrics_dir, verbose_metrics=self.verbose_metrics)
 
                 """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""
