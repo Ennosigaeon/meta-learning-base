@@ -4,6 +4,11 @@ This module contains the Core class, which is the one responsible for
 executing and orchestrating the main Core functionalities.
 """
 
+# TODO two different loggers are used. Only use one
+# TODO Logging verbessern. Es ist nur aus dem log schwer zu erkennen was passiert
+#   - Warning ausblenden
+#   - StackTraces für Fehler in Workern ausblenden
+
 import logging
 import random
 
