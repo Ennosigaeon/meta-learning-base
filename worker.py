@@ -107,6 +107,7 @@ class Worker(object):
             """Convert np array y_pred to pd series and add it to X"""
             y_pred = pd.Series(y_pred)
             X = pd.concat([X, y_pred], axis=1)
+            X.columns = range(X.shape[1])
 
             return X, {'accuracy': accuracy,
                        'precision': precision,
