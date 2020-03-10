@@ -139,7 +139,6 @@ class ClassProbabilitySTD(MetaFeature):
             return float((occurences / y.shape[0]).std())
 
 
-# # TODO PCA not working yet
 # class PCA(HelperFunction):
 #     def _calculate(self, X, y, categorical):
 #         from sklearn.decomposition.pca import PCA
@@ -192,12 +191,12 @@ class MetaFeatures(object):
         # ##########################################################################
 
         """
-        Loading train_path
+        Loads dataframe and splits it in X, y
         """
         X, y = df.drop(class_column, axis=1), df[class_column]
 
         """
-        Selecting Meta Features and extracting them
+        Selects Meta Features and extracts them
         """
         mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
                              'sparsity', 'gravity', 'var', 'class_ent', 'attr_ent', 'mut_inf',

@@ -111,8 +111,8 @@ class Dataset(Base):
     cor_sd = Column(Numeric)
     cov_mean = Column(Numeric)
     cov_sd = Column(Numeric)
-    attr_conc_mean = Column(Numeric)
-    attr_conc_sd = Column(Numeric)
+    # attr_conc_mean = Column(Numeric)
+    # attr_conc_sd = Column(Numeric)
     sparsity_mean = Column(Numeric)
     sparsity_sd = Column(Numeric)
     gravity = Column(Numeric)
@@ -201,8 +201,8 @@ class Dataset(Base):
         self.cor_sd = cor_sd
         self.cov_mean = cov_mean
         self.cov_sd = cov_sd
-        self.attr_conc_mean = attr_conc_mean
-        self.attr_conc_sd = attr_conc_sd
+        # self.attr_conc_mean = attr_conc_mean
+        # self.attr_conc_sd = attr_conc_sd
         self.sparsity_mean = sparsity_mean
         self.sparsity_sd = sparsity_sd
         self.gravity = gravity
@@ -276,9 +276,10 @@ class Algorithm(Base):
     neg_log_loss = Column(Numeric(precision=20, scale=10))
     roc_auc_score = Column(Numeric(precision=20, scale=10))
 
-    cv_judgment_metric = Column(Numeric(precision=20, scale=10))
-    cv_judgment_metric_stdev = Column(Numeric(precision=20, scale=10))
-    test_judgment_metric = Column(Numeric(precision=20, scale=10))
+    # TODO do we still need cross validation score as evaluation metric?
+    # cv_judgment_metric = Column(Numeric(precision=20, scale=10))
+    # cv_judgment_metric_stdev = Column(Numeric(precision=20, scale=10))
+    # test_judgment_metric = Column(Numeric(precision=20, scale=10))
 
     """
     Hostname
@@ -300,13 +301,13 @@ class Algorithm(Base):
 
         self.hyperparameter_values_64 = object_to_base_64(d)
 
-    @property
-    def mu_sigma_judgment_metric(self):
-        # compute the lower confidence bound on the cross-validated
-        # judgment metric
-        if self.cv_judgment_metric is None:
-            return None
-        return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
+    # @property
+    # def mu_sigma_judgment_metric(self):
+    #     # compute the lower confidence bound on the cross-validated
+    #     # judgment metric
+    #     if self.cv_judgment_metric is None:
+    #         return None
+    #     return self.cv_judgment_metric - 2 * self.cv_judgment_metric_stdev
 
     def __init__(self,
                  algorithm: str,
@@ -366,9 +367,9 @@ class Algorithm(Base):
         to_print = [
             'Algorithm id: {}'.format(self.id),
             'Params chosen: \n{}'.format(params),
-            'Cross Validation Score: {:.3f} +- {:.3f}'.format(
-                self.cv_judgment_metric, self.cv_judgment_metric_stdev),
-            'Test Score: {:.3f}'.format(self.test_judgment_metric),
+            # 'Cross Validation Score: {:.3f} +- {:.3f}'.format(
+            #     self.cv_judgment_metric, self.cv_judgment_metric_stdev),
+            # 'Test Score: {:.3f}'.format(self.test_judgment_metric),
         ]
 
         return '\n'.join(to_print)
@@ -465,7 +466,7 @@ class Database(object):
         Get a list of all algorithms matching the chosen filters.
 
         Args:
-            dataset_id:
+            dataset_id: id of the corresponding dataset
             ignore_errored: if True, ignore algorithms that are errored
             ignore_running: if True, ignore algorithms that are already running
             ignore_complete: if True, ignore completed algorithms

@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from typing import Tuple
 
 import boto3
 import botocore
@@ -8,7 +9,6 @@ import openml
 import pandas as pd
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
-from typing import Tuple
 
 from config import DatasetConfig
 
@@ -55,14 +55,26 @@ def load_data(path: str, s3_endpoint: str = None, s3_bucket: str = None, s3_acce
 
 
 def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
-    # TODO what if name already exists?
+    LOGGER.info('Saving file to working directory.')
+
     # TODO what if disk is full? python-diskcache
+
+    # Checks if working directory already exists --> If not create working directory
     if not os.path.isdir(work_dir):
         LOGGER.info('Creating work directory \'{}\''.format(work_dir))
         os.mkdir(work_dir)
 
+    # TODO what if filename already exists?
+    # Checks if filename already exists in directory. As long as isfile(name) = True --> create uuid as new name
+    # while os.path.isfile(name + '.parquet') is True:
+    #     LOGGER.info('Filename {} already exists.'.format(name))
+    #     name = str(uuid.uuid4())
+    #     LOGGER.info('Set generated uuid {} as new filename.'.format(name))
+
+    # Create path and save dataframe as parquet-file to that path
     path = os.path.join(work_dir, name) + '.parquet'
     df.to_parquet(path)
+
     return path
 
 
