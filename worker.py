@@ -128,6 +128,9 @@ class Worker(object):
 
             X = pd.DataFrame(data=X, index=range(X.shape[0]), columns=range(X.shape[1]))
 
+            # Change dtype of column names to string --> parquet must have string column names
+            X.columns = X.columns.astype(str)
+
             return X, {}
 
     def save_algorithm(self, algorithm_id: Optional[int], res: Tuple[pd.DataFrame, Dict[str, float]]) -> None:
@@ -144,9 +147,6 @@ class Worker(object):
         """Call complete_algorithm to save the algorithm to the database."""
         self.db.complete_algorithm(algorithm_id=algorithm_id, **res[1])
         LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
-
-        # TODO use is_close or pandas equivalent
-        # --> gibt bei pandas nur .equals und .assert_frame_equal
 
         """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
         # noinspection PyTypeChecker

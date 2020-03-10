@@ -1,8 +1,7 @@
 """Command Line Interfaced module."""
 
-import logging
-
 import argparse
+import logging
 
 from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig
 from core import Core
