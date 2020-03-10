@@ -3,12 +3,12 @@ import random
 import traceback
 import warnings
 
-import numpy as np
 import pandas as pd
 import pynisher2
 import socket
 from builtins import object, str
 from datetime import datetime
+from pandas.util.testing import assert_frame_equal
 from sklearn.base import BaseEstimator, is_classifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import cross_val_predict
@@ -146,20 +146,16 @@ class Worker(object):
         LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
 
         """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
-        if input_df.shape == res[0].shape:
-            # noinspection PyTypeChecker
-            if np.allclose(res[0].to_numpy(dtype=float), input_df.to_numpy()):
-                LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
-                            .format(self.dataset.id))
-
-        else:
-            """Load class_column and join transformed dataset with removed class_column of the input dataset.
-            Add transformed dataset to DB"""
+        try:
+            assert_frame_equal(res[0], input_df)
+            LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
+                        .format(self.dataset.id))
+        except AssertionError:
+            LOGGER.info('Transformed dataset will be stored in DB.')
             new_dataset = pd.concat([res[0], dataset_class_column], axis=1)
             depth = self.dataset.depth
             depth += 1
             self.core.add_dataset(new_dataset, class_column, depth=depth)
-            LOGGER.info('Transformed dataset will be stored in DB.')
 
     def is_dataset_finished(self):
         """
