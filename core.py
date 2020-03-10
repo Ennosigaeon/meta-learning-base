@@ -88,12 +88,6 @@ class Core(object):
                 The max pipeline depth a dataset can reach.
 
         """
-        # TODO validate if dataset already exists
-        # 1. Calculate hash of dataframe
-        # 2. Compare hash with database
-        # 3. Load all datasets with same hash
-        # 4. Do values-based comparision
-        # 5. If dataset already exists skip it
 
         """Generate name using a random uuid, if input dataset has no name"""
         if not name or name.strip() == '':
@@ -233,8 +227,8 @@ class Core(object):
                 while ds.status == RunStatus.RUNNING:
                     worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)
-                    if verbose and ds.completed_algorithm > pbar.last_print_n:
-                        pbar.update(ds.completed_algorithm - pbar.last_print_n)
+                    if verbose and ds.processed > pbar.last_print_n:
+                        pbar.update(ds.processed - pbar.last_print_n)
 
                 pbar.close()
             except AlgorithmError:
