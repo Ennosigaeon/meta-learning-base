@@ -128,9 +128,6 @@ class Worker(object):
 
             X = pd.DataFrame(data=X, index=range(X.shape[0]), columns=range(X.shape[1]))
 
-            # Change dtype of column names to string --> parquet must have string column names
-            X.columns = X.columns.astype(str)
-
             return X, {}
 
     def save_algorithm(self, algorithm_id: Optional[int], res: Tuple[pd.DataFrame, Dict[str, float]]) -> None:
@@ -149,10 +146,11 @@ class Worker(object):
         LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
 
         """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
-        # noinspection PyTypeChecker
-        if np.allclose(res[0].to_numpy(dtype=float), input_df.to_numpy()):
-            LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
-                        .format(self.dataset.id))
+        if input_df.shape == res[0].shape:
+            # noinspection PyTypeChecker
+            if np.allclose(res[0].to_numpy(dtype=float), input_df.to_numpy()):
+                LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
+                            .format(self.dataset.id))
 
         else:
             """Load class_column and join transformed dataset with removed class_column of the input dataset.

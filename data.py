@@ -71,6 +71,9 @@ def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
     #     name = str(uuid.uuid4())
     #     LOGGER.info('Set generated uuid {} as new filename.'.format(name))
 
+    # Change dtype of column names to string --> parquet must have string column names
+    df.columns = df.columns.astype(str)
+
     # Create path and save dataframe as parquet-file to that path
     path = os.path.join(work_dir, name) + '.parquet'
     df.to_parquet(path)
