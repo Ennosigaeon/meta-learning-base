@@ -6,7 +6,7 @@ import pandas as pd
 from autosklearn.metalearning.metafeatures.metafeature import MetaFeature
 from pymfe.mfe import MFE
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger('mlb')
 
 
 class NumberOfMissingValues(MetaFeature):

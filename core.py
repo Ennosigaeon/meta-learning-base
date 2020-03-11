@@ -115,9 +115,9 @@ class Core(object):
         except ValueError as ex:
             LOGGER.exception('Failed to compute meta-features. Fallback to empty meta-features', ex)
             mf = {}
-        LOGGER.info('Extracted Metafeatures')
+        LOGGER.debug('Extracted Metafeatures')
         """Saves input dataset and calculated metafeatures to db"""
-        LOGGER.info('Saving {}'.format(local_file))
+        LOGGER.info('Creating dataset {}'.format(name))
         return self.db.create_dataset(
             train_path=local_file,
             name=name,
@@ -182,6 +182,7 @@ class Core(object):
                 ds = random.choice(candidates)
             else:
                 ds = sorted(candidates, key=attrgetter('id'))[0]
+            LOGGER.info('Computing on dataset {}'.format(ds.id))
 
             """
             Mark dataset as RUNNING
@@ -190,8 +191,6 @@ class Core(object):
                 self.db.mark_dataset_running(ds.id)
             except UserWarning:
                 LOGGER.warning('Skipping completed dataset: {}'.format(ds.id))
-
-            LOGGER.info('Computing on dataset {}'.format(ds.id))
 
             """
             Progress bar

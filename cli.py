@@ -1,16 +1,15 @@
 """Command Line Interfaced module."""
 
-import argparse
 import logging
 
+import argparse
+
 from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig
-from core import Core
-from data import load_data, load_openml
-
-LOGGER = logging.getLogger(__name__)
 
 
-def _get_core(args) -> Core:
+def _get_core(args):
+    from core import Core
+
     sql_conf = SQLConfig(args)
     s3_conf = S3Config(args)
     log_conf = LogConfig(args)
@@ -36,6 +35,8 @@ def _work(args):
 
 
 def _enter_data(args):
+    from data import load_data, load_openml
+
     core = _get_core(args)
     dataset_conf = DatasetConfig(args)
 
@@ -112,7 +113,7 @@ def _get_parser():
 def _logging_setup(verbosity=1, logfile=None):
     logger = logging.getLogger()
     log_level = (2 - verbosity) * 10
-    fmt = '%(asctime)s - %(process)d - %(levelname)s - %(module)s - %(message)s'
+    fmt = '%(asctime)s - %(levelname)s - %(module)s - %(message)s'
     formatter = logging.Formatter(fmt)
     logger.setLevel(log_level)
     logger.propagate = False
@@ -128,6 +129,12 @@ def _logging_setup(verbosity=1, logfile=None):
         console_handler.setLevel(log_level)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
+
+    logging.getLogger('boto3').setLevel(logging.CRITICAL)
+    logging.getLogger('botocore').setLevel(logging.CRITICAL)
+    logging.getLogger('s3transfer').setLevel(logging.CRITICAL)
+    logging.getLogger('urllib3').setLevel(logging.CRITICAL)
+    logging.getLogger('mlb:worker').setLevel(logging.INFO)
 
 
 def main():

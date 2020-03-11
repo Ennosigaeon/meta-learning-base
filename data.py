@@ -55,9 +55,10 @@ def load_data(path: str, s3_endpoint: str = None, s3_bucket: str = None, s3_acce
 
 
 def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
-    LOGGER.info('Saving file to working directory.')
-
     # TODO what if disk is full? python-diskcache
+
+    path = os.path.join(work_dir, name) + '.parquet'
+    LOGGER.debug('Saving dataframe locally in {}'.format(path))
 
     # Checks if working directory already exists --> If not create working directory
     if not os.path.isdir(work_dir):
@@ -74,8 +75,7 @@ def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
     # Change dtype of column names to string --> parquet must have string column names
     df.columns = df.columns.astype(str)
 
-    # Create path and save dataframe as parquet-file to that path
-    path = os.path.join(work_dir, name) + '.parquet'
+    # Save dataframe as parquet-file to that path
     df.to_parquet(path)
 
     return path
@@ -114,7 +114,7 @@ def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key
     if name is None:
         name = input_file.split('/')[-1]
     try:
-        LOGGER.info('Uploading {}'.format(input_file))
+        LOGGER.debug('Uploading {} to S3'.format(input_file))
         client.upload_file(input_file, s3_bucket, '{}.parquet'.format(name))
         remote_path = "{0}/{1}/{2}".format(s3_endpoint, s3_bucket, name)
         return input_file, remote_path

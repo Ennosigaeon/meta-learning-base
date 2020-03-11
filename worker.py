@@ -31,7 +31,20 @@ HOSTNAME = socket.gethostname()
 
 # Exception thrown when something goes wrong for the worker, but the worker handles the error.
 class AlgorithmError(Exception):
-    pass
+
+    def __init__(self, message: str, details: str = None):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+
+        # Now for your custom code...
+        self._details = details
+
+    @property
+    def details(self) -> str:
+        if self._details is not None:
+            return self._details
+        else:
+            str(self)
 
 
 class Worker(object):
@@ -60,6 +73,8 @@ class Worker(object):
 
         self.max_pipeline_depth = max_pipeline_depth
         self.verbose_metrics = verbose_metrics
+
+        self.subprocess_logger = logging.getLogger('mlb:worker')
 
         """
         Load the Dataset from the database
@@ -220,15 +235,15 @@ class Worker(object):
             LOGGER.info('Dataset {} has been marked as complete.'.format(self.dataset))
 
             delete_data(self.dataset.train_path)
-            LOGGER.info('Complete dataset {} has been removed from local storage.'.format(self.dataset))
             return
 
         """
         Choose a random algorithm to work on the dataset
         """
         try:
-            LOGGER.info('Starting new algorithm...')
-            algorithm = Algorithm(random.choice(list(ALGORITHMS.keys())),
+            algo_type = random.choice(list(ALGORITHMS.keys()))
+            LOGGER.info('Starting new algorithm \'{}\'...'.format(algo_type))
+            algorithm = Algorithm(algo_type,
                                   dataset_id=self.dataset.id,
                                   status=AlgorithmStatus.RUNNING,
                                   start_time=datetime.now(),
@@ -238,16 +253,15 @@ class Worker(object):
             params = algorithm.random_config()
             algorithm.hyperparameter_values = params
 
-            param_info = 'Chose parameters for algorithm "{}":'.format(algorithm.hyperparameter_values)
+            param_info = 'Chose parameters for algorithm :'.format(algorithm.hyperparameter_values)
             for k in sorted(params.keys()):
                 param_info += '\n\t{} = {}'.format(k, params[k])
             LOGGER.debug(param_info)
         except Exception as ex:
             if isinstance(ex, KeyboardInterrupt):
                 raise ex
-            LOGGER.error('Error choosing algorithm with hyperparameters for dataset {}'.format(self.dataset))
-            LOGGER.error(traceback.format_exc())
-            raise AlgorithmError()
+            LOGGER.error('Failed to select hyperparameters', ex)
+            raise AlgorithmError(str(ex), traceback.format_exc())
 
         """
         Create the algorithm and add it to the database
@@ -259,16 +273,14 @@ class Worker(object):
         Transform the dataset and save the algorithm
         """
         try:
-            LOGGER.debug('Testing algorithm...')
-
-            # TODO pass logger to enable logging
-            wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout)(self.transform_dataset)
+            wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout, logger=self.subprocess_logger)(
+                self.transform_dataset)
             res = wrapper(algorithm.instance(params))
 
             if wrapper.exit_status is pynisher2.TimeoutException:
-                raise TimeoutError('')
+                raise TimeoutError('Timeout')
             elif wrapper.exit_status is pynisher2.MemorylimitException:
-                raise MemoryError('')
+                raise MemoryError('MemoryLimit')
             elif wrapper.exit_status is pynisher2.AnythingException:
                 # TODO res can be None
                 # 2020-03-10 22:33:35,680 - 4324 - ERROR - worker - Unexpected error testing algorithm: dataset=<5bcfaa17-0bc1-4722-986f-2f579a901cda: 2.0000000000 classes, 145.0000000000 features, 2984.0000000000 rows>
@@ -276,7 +288,7 @@ class Worker(object):
                 #   File "/mnt/c/local/phd/code/meta-learning-base/worker.py", line 266, in run_algorithm
                 #     raise pynisher2.AnythingException(res[1])
                 # TypeError: 'NoneType' object is not subscriptable
-                raise pynisher2.AnythingException(res[1])
+                raise AlgorithmError(res[0], res[1])
             elif wrapper.exit_status == 0 and res is not None:
                 LOGGER.debug('Saving algorithm...')
                 self.save_algorithm(algorithm.id, res)
@@ -291,11 +303,12 @@ class Worker(object):
 
         except KeyboardInterrupt:
             raise
-        except (TimeoutError, MemoryError, pynisher2.AnythingException) as ex:
-            # TODO only message and no stacktrace
-            msg = str(ex)
-            LOGGER.warning('Failed to test algorithm: dataset={}\n{}'.format(self.dataset, msg))
-            self.db.mark_algorithm_errored(algorithm.id, error_message=msg)
+        except (TimeoutError, MemoryError) as ex:
+            LOGGER.info('Algorithm violated constraints: {}'.format(str(ex)))
+            self.db.mark_algorithm_errored(algorithm.id, error_message=str(ex))
+        except AlgorithmError as ex:
+            LOGGER.info('Algorithm raised exception: {}'.format(str(ex)))
+            self.db.mark_algorithm_errored(algorithm.id, error_message=ex.details)
         except Exception:
             msg = traceback.format_exc()
             LOGGER.error('Unexpected error testing algorithm: dataset={}\n{}'.format(self.dataset, msg))
