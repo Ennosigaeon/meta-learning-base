@@ -4,20 +4,16 @@ This module contains the Core class, which is the one responsible for
 executing and orchestrating the main Core functionalities.
 """
 
-# TODO two different loggers are used. Only use one
-# TODO Logging verbessern. Es ist nur aus dem log schwer zu erkennen was passiert
-#   - Warning ausblenden
-#   - StackTraces für Fehler in Workern ausblenden
-
 import logging
+import os
 import random
-
-import signal
-import time
-import uuid
 from operator import attrgetter
 
 import pandas as pd
+import shutil
+import signal
+import time
+import uuid
 from tqdm import tqdm
 from typing import List
 
@@ -27,7 +23,6 @@ from database import Database, Dataset
 from metafeatures import MetaFeatures
 from utilities import hash_file
 from worker import AlgorithmError, Worker
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +45,7 @@ class Core(object):
             # Generic Conf,
             work_dir: str = None,
             timeout: int = None,
+            cache_percentage: float = 0.8,
 
             # S3 Conf
             endpoint: str = None,
@@ -71,6 +67,10 @@ class Core(object):
 
         self.verbose_metrics: bool = verbose_metrics
         self._abort = False
+
+        LOGGER.info('Scanning cache dir. This may take some while...')
+        self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
+        self.cache_percentage = cache_percentage
 
     def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, name: str = None):
         """Add a new dataset to the Database.
@@ -95,7 +95,7 @@ class Core(object):
             name = str(uuid.uuid4())
 
         """Stores input dataset to local working directory"""
-        local_file = store_data(df, self.work_dir, name)
+        local_file = self._cache_locally(df, name)
 
         """Check if new dataset equals existing dataset. If False store transformed dataset to DB"""
         hashcode = hash_file(local_file)
@@ -126,6 +126,31 @@ class Core(object):
             hashcode=hashcode,
             **mf
         )
+
+    def _cache_locally(self, df: pd.DataFrame, name: str) -> str:
+        def clean_cache():
+            LOGGER.info('Cleaning cache. This may take some while...')
+
+            list_of_files = [os.path.join(self.work_dir, f) for f in os.listdir(self.work_dir)]
+            list_of_files = sorted(list_of_files, key=os.path.getatime)
+            n = int(len(list_of_files) / 2)
+            for idx in range(n):
+                os.remove(list_of_files[idx])
+
+            self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
+            LOGGER.info('Deleted {} files. Using {} of cache'.format(n, self.cache_used / self.cache_total))
+
+        try:
+            local_file = store_data(df, self.work_dir, name)
+        except IOError:
+            clean_cache()
+            local_file = store_data(df, self.work_dir, name)
+
+        self.cache_used += os.stat(local_file).st_size
+        if self.cache_used / self.cache_total > self.cache_percentage:
+            clean_cache()
+
+        return local_file
 
     def _user_abort(self):
         LOGGER.info('Received abort signal. Stopping processing after current evaluation...')
