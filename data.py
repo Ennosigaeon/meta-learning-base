@@ -55,7 +55,6 @@ def load_data(path: str, s3_endpoint: str = None, s3_bucket: str = None, s3_acce
 
 
 def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
-    # TODO what if disk is full? python-diskcache
 
     path = os.path.join(work_dir, name) + '.parquet'
     LOGGER.debug('Saving dataframe locally in {}'.format(path))
@@ -64,13 +63,6 @@ def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
     if not os.path.isdir(work_dir):
         LOGGER.info('Creating work directory \'{}\''.format(work_dir))
         os.mkdir(work_dir)
-
-    # TODO what if filename already exists?
-    # Checks if filename already exists in directory. As long as isfile(name) = True --> create uuid as new name
-    # while os.path.isfile(name + '.parquet') is True:
-    #     LOGGER.info('Filename {} already exists.'.format(name))
-    #     name = str(uuid.uuid4())
-    #     LOGGER.info('Set generated uuid {} as new filename.'.format(name))
 
     # Change dtype of column names to string --> parquet must have string column names
     df.columns = df.columns.astype(str)
@@ -82,10 +74,14 @@ def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
 
 
 def delete_data(train_path: str):
-    if os.path.exists(train_path):
-        os.remove(train_path)
-    else:
-        LOGGER.info('Dataset does not exist in local storage.')
+
+    try:
+        if os.path.exists(train_path):
+            os.remove(train_path)
+        else:
+            LOGGER.info('Dataset does not exist in local storage.')
+    except OSError:
+        LOGGER.warning('Unable to delete {}'.format(train_path))
 
 
 def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,

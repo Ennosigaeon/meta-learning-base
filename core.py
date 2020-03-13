@@ -5,6 +5,7 @@ executing and orchestrating the main Core functionalities.
 """
 
 import logging
+import math
 import os
 import random
 from operator import attrgetter
@@ -112,6 +113,11 @@ class Core(object):
         """Calculates metafeatures for input dataset"""
         try:
             mf = self.metafeatures.calculate(df=df, class_column=class_column)
+            for key, value in mf.items():
+                if math.isinf(value):
+                    value = math.nan
+                    LOGGER.info('Value of Meta Feature "{}" is infinite and replaced by nan'.format(key))
+
         except ValueError as ex:
             LOGGER.exception('Failed to compute meta-features. Fallback to empty meta-features', ex)
             mf = {}

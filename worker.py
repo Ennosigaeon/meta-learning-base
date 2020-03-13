@@ -105,19 +105,16 @@ class Worker(object):
 
         if is_classifier(algorithm):
 
-            """Predict labels with 5 fold cross validation"""
+            """Predict labels with n fold cross validation"""
             y_pred = cross_val_predict(algorithm, X, y, cv=n_folds)
 
-            # TODO switch/if else ob multiclass oder nicht
-            # --> multiclass
+            """Calculate evaluation metrics"""
             accuracy = accuracy_score(y, y_pred)
             precision = precision_score(y, y_pred, average='macro')
             recall = recall_score(y, y_pred, average='macro')
             f1 = f1_score(y, y_pred, average='macro')
             log_loss = logloss(y, y_pred)
             roc_auc = multiclass_roc_auc_score(y, y_pred, average='macro')
-
-            # --> not multiclass
 
             """Convert np array y_pred to pd series and add it to X"""
             y_pred = pd.Series(y_pred)
