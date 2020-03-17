@@ -272,8 +272,8 @@ class Worker(object):
         try:
             wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout, logger=self.subprocess_logger)(
                 self.transform_dataset)
-            res = wrapper(algorithm.instance(params))
-
+            instance = algorithm.instance(params)
+            res = wrapper(instance)
             if wrapper.exit_status is pynisher2.TimeoutException:
                 raise TimeoutError('Timeout')
             elif wrapper.exit_status is pynisher2.MemorylimitException:
@@ -304,7 +304,7 @@ class Worker(object):
             LOGGER.info('Algorithm violated constraints: {}'.format(str(ex)))
             self.db.mark_algorithm_errored(algorithm.id, error_message=str(ex))
         except AlgorithmError as ex:
-            LOGGER.info('Algorithm raised exception: {}'.format(str(ex)))
+            LOGGER.info('Algorithm raised exception: {}'.format(ex.details))
             self.db.mark_algorithm_errored(algorithm.id, error_message=ex.details)
         except Exception:
             msg = traceback.format_exc()

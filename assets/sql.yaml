@@ -2,10 +2,10 @@ dialect: 'postgres'
 database: 'postgres'
 username: 'postgres'
 
-# password: 'postgres'
-password: 'usu4867!'  # gcloud
 
-# host: 'localhost'  # local
-host: '35.246.228.109'  # gcloud
+password: 'usu4867!'
+
+host: 'localhost'  # local
+# host: '35.246.228.109'  # gcloud
 
 port: 5432

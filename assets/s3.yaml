@@ -1,9 +1,9 @@
-# endpoint: 'http://localhost:9090'  # local
-endpoint: 'http://35.246.228.109:9090'  # gcloud
+endpoint: 'http://localhost:9090'  # local
+# endpoint: 'http://35.246.228.109:9090'  # gcloud
 
 access_key: 'access_key'
 
-# secret_key: 'secret_key'  # local
-secret_key: 'usu4867!'  # gcloud
+secret_key: 'secret_key'  # local
+# secret_key: 'usu4867!'  # gcloud
 
 bucket: 'meta-learning'

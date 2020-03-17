@@ -339,13 +339,13 @@ class Algorithm(Base):
         cs = ALGORITHMS[self.algorithm].get_hyperparameter_search_space()
         self.cs = cs
 
-    def random_config(self):
+    def random_config(self) -> Configuration:
         return self.cs.sample_configuration()
 
-    def default_config(self):
+    def default_config(self) -> Configuration:
         return self.cs.get_default_configuration()
 
-    def instance(self, params: Dict[str, Any] = None) -> BaseEstimator:
+    def instance(self, params: Configuration = None) -> BaseEstimator:
         if params is None:
             if self.hyperparameter_values is None:
                 params = self.random_config()
@@ -354,7 +354,8 @@ class Algorithm(Base):
 
         # noinspection PyTypeChecker
         # EstimatorComponent inherits from BaseEstimator
-        return ALGORITHMS[self.algorithm](**params)
+        instance = ALGORITHMS[self.algorithm](**params.get_dictionary())
+        return instance
 
     def __repr__(self):
         params = '\n'.join(
