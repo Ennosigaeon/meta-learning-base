@@ -2,8 +2,8 @@ dialect: 'postgres'
 database: 'postgres'
 username: 'postgres'
 
-
-password: 'usu4867!'
+password: 'postgres'
+# password: 'usu4867!'  # gcloud
 
 host: 'localhost'  # local
 # host: '35.246.228.109'  # gcloud
