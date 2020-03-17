@@ -9,5 +9,5 @@ from automl.components.feature_preprocessing import FeaturePreprocessorChoice
 """Generates dict with all available Algorithms from sklearn-components"""
 ALGORITHMS: Dict[str, Type[EstimatorComponent]] = {}
 # ALGORITHMS.update(ClassifierChoice().get_components())
-# ALGORITHMS.update(DataPreprocessorChoice().get_components())
-ALGORITHMS.update(FeaturePreprocessorChoice().get_components())
+ALGORITHMS.update(DataPreprocessorChoice().get_components())
+# ALGORITHMS.update(FeaturePreprocessorChoice().get_components())
