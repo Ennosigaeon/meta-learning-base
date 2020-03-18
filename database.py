@@ -111,11 +111,8 @@ class Dataset(Base):
     cor_sd = Column(Numeric)
     cov_mean = Column(Numeric)
     cov_sd = Column(Numeric)
-    # attr_conc_mean = Column(Numeric)
-    # attr_conc_sd = Column(Numeric)
     sparsity_mean = Column(Numeric)
     sparsity_sd = Column(Numeric)
-    gravity = Column(Numeric)
     var_mean = Column(Numeric)
     var_sd = Column(Numeric)
 
@@ -161,7 +158,7 @@ class Dataset(Base):
                  depth: int = 0, hashcode: str = None,
                  nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
                  kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
-                 attr_conc_mean=None, attr_conc_sd=None, sparsity_mean=None, sparsity_sd=None, gravity=None,
+                 sparsity_mean=None, sparsity_sd=None,
                  var_mean=None, var_sd=None, class_ent=None, attr_ent_mean=None, attr_ent_sd=None, mut_inf_mean=None,
                  mut_inf_sd=None, eq_num_attr=None, ns_ratio=None, nodes=None, leaves=None,
                  leaves_branch_mean=None, leaves_branch_sd=None, nodes_per_attr=None, leaves_per_class_mean=None,
@@ -201,11 +198,8 @@ class Dataset(Base):
         self.cor_sd = cor_sd
         self.cov_mean = cov_mean
         self.cov_sd = cov_sd
-        # self.attr_conc_mean = attr_conc_mean
-        # self.attr_conc_sd = attr_conc_sd
         self.sparsity_mean = sparsity_mean
         self.sparsity_sd = sparsity_sd
-        self.gravity = gravity
         self.var_mean = var_mean
         self.var_sd = var_sd
 

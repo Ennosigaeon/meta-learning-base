@@ -1,3 +1,4 @@
+import math
 from collections import defaultdict
 
 import logging
@@ -12,7 +13,7 @@ LOGGER = logging.getLogger('mlb')
 class NumberOfMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
         X_numeric = X.select_dtypes(include=['float64', 'int64'])
-        X_object = X.select_dtypes(include=['object'])
+        X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
             missing = ~np.isfinite(X_numeric)
@@ -34,7 +35,7 @@ class NumberOfMissingValues(MetaFeature):
 class PercentageOfMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
         X_numeric = X.select_dtypes(include=['float64', 'int64'])
-        X_object = X.select_dtypes(include=['object'])
+        X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
             missing = ~np.isfinite(X_numeric)
@@ -56,7 +57,7 @@ class PercentageOfMissingValues(MetaFeature):
 class NumberOfInstancesWithMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
         X_numeric = X.select_dtypes(include=['float64', 'int64'])
-        X_object = X.select_dtypes(include=['object'])
+        X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
             missing = ~np.isfinite(X_numeric)
@@ -77,7 +78,7 @@ class NumberOfInstancesWithMissingValues(MetaFeature):
 class NumberOfFeaturesWithMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
         X_numeric = X.select_dtypes(include=['float64', 'int64'])
-        X_object = X.select_dtypes(include=['object'])
+        X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
             missing = ~np.isfinite(X_numeric)
@@ -199,17 +200,17 @@ class MetaFeatures(object):
         Selects Meta Features and extracts them
         """
         mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
-                             'sparsity', 'gravity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
+                             'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
                              'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
                              'var_importance', 'one_nn', 'best_node', 'linear_discr',
-                             'naive_bayes', 'leaves_per_class']),  # 'attr_conc' --> low performance
+                             'naive_bayes', 'leaves_per_class']),
                   random_state=random_state)
 
         # noinspection PyTypeChecker
         # TODO pymfe seems to be unable to handle missing values
         # Example dataset: https://www.openml.org/d/24
-        mfe.fit(X.to_numpy(), y.to_numpy())
 
+        mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=False)
         f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
         """
@@ -219,17 +220,12 @@ class MetaFeatures(object):
         nr_attr = int(f_value[f_name.index('nr_attr')])
         nr_class = int(f_value[f_name.index('nr_class')])
         nr_outliers = int(f_value[f_name.index('nr_outliers')])
-        gravity = float(f_value[f_name.index('gravity')])
         class_ent = float(f_value[f_name.index('class_ent')])
         eq_num_attr = float(f_value[f_name.index('eq_num_attr')])
         ns_ratio = float(f_value[f_name.index('ns_ratio')])
         nodes = float(f_value[f_name.index('nodes')])
         leaves = float(f_value[f_name.index('leaves')])
         nodes_per_attr = float(f_value[f_name.index('nodes_per_attr')])
-
-        # ---> low performance
-        # attr_conc_mean = float(f_value[f_name.index('attr_conc.mean')])
-        # attr_conc_sd = float(f_value[f_name.index('attr_conc.sd')])
 
         try:
             skewness_mean = float(f_value[f_name.index('skewness.mean')])
@@ -310,7 +306,7 @@ class MetaFeatures(object):
         try:
             leaves_branch_sd = float(f_value[f_name.index('leaves_branch.sd')])
         except:
-            leaves_branch_sd = float(f_value[f_name.index('leaves_branch.sd')])
+            leaves_branch_sd = float(f_value[f_name.index('leaves_branch')])
 
         try:
             leaves_per_class_mean = float(f_value[f_name.index('leaves_per_class.mean')])
@@ -414,7 +410,6 @@ class MetaFeatures(object):
             # 'attr_conc_sd': attr_conc_sd,
             'sparsity_mean': sparsity_mean,
             'sparsity_sd': sparsity_sd,
-            'gravity': gravity,
             'var_mean': var_mean,
             'var_sd': var_sd,
 
