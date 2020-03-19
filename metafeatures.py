@@ -41,7 +41,7 @@ class PercentageOfMissingValues(MetaFeature):
             missing = ~np.isfinite(X_numeric)
             missing = missing.sum().sum()
 
-            return float(missing) / float(X.shape[0] * X.shape[1])
+            return (float(missing) / float(X.shape[0] * X.shape[1])) * 100
         else:
             missing_o = pd.isna(X_object)
             missing_o = missing_o.sum().sum()
@@ -51,7 +51,7 @@ class PercentageOfMissingValues(MetaFeature):
 
             missing = missing_n + missing_o
 
-            return float(missing) / float(X.shape[0] * X.shape[1])
+            return (float(missing) / float(X.shape[0] * X.shape[1])) * 100
 
 
 class NumberOfInstancesWithMissingValues(MetaFeature):
@@ -372,11 +372,11 @@ class MetaFeatures(object):
 
         nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
 
-        pct_inst_mv = float(nr_inst_mv) / float(nr_inst)
+        pct_inst_mv = (float(nr_inst_mv) / float(nr_inst)) * 100
 
         nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
 
-        pct_attr_mv = float(nr_attr_mv) / float(nr_attr)
+        pct_attr_mv = (float(nr_attr_mv) / float(nr_attr)) * 100
 
         class_prob_mean = ClassProbabilityMean()(X, y, categorical=True).value
 
