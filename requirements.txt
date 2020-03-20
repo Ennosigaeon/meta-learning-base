@@ -3,10 +3,11 @@ PyYAML==3.12
 boto3==1.10.17
 botocore==1.13.17
 numpy==1.16.2
-openml
+openml==0.10.2
 pandas==0.24.2
 psycopg2==2.7.7
 pyarrow
+pynisher2==0.5.0
 pymfe==0.1.0
 pymysql==0.9.3
 requests==2.18.4
