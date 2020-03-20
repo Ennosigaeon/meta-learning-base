@@ -110,11 +110,12 @@ class Worker(object):
 
             """Calculate evaluation metrics"""
             accuracy = accuracy_score(y, y_pred)
-            precision = precision_score(y, y_pred, average='macro')
-            recall = recall_score(y, y_pred, average='macro')
-            f1 = f1_score(y, y_pred, average='macro')
+            precision = precision_score(y, y_pred, average='weighted')
+            recall = recall_score(y, y_pred, average='weighted')
+            f1 = f1_score(y, y_pred, average='weighted')
+            # TODO
             log_loss = logloss(y, y_pred)
-            roc_auc = multiclass_roc_auc_score(y, y_pred, average='macro')
+            roc_auc = multiclass_roc_auc_score(y, y_pred, average='weighted')
 
             """Convert np array y_pred to pd series and add it to X"""
             y_pred = pd.Series(y_pred)
