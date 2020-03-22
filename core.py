@@ -113,9 +113,10 @@ class Core(object):
         """Calculates metafeatures for input dataset"""
         try:
             mf = self.metafeatures.calculate(df=df, class_column=class_column)
+
             for key, value in mf.items():
                 if math.isinf(value):
-                    value = math.nan
+                    mf[key] = float('NaN')
                     LOGGER.info('Value of Meta Feature "{}" is infinite and replaced by nan'.format(key))
 
         except ValueError as ex:

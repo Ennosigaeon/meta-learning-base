@@ -406,8 +406,6 @@ class MetaFeatures(object):
             'cor_sd': cor_sd,
             'cov_mean': cov_mean,
             'cov_sd': cov_sd,
-            # 'attr_conc_mean': attr_conc_mean,
-            # 'attr_conc_sd': attr_conc_sd,
             'sparsity_mean': sparsity_mean,
             'sparsity_sd': sparsity_sd,
             'var_mean': var_mean,
