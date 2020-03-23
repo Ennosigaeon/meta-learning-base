@@ -117,7 +117,7 @@ class Core(object):
             for key, value in mf.items():
                 if math.isinf(value):
                     mf[key] = float('NaN')
-                    LOGGER.info('Value of Meta Feature "{}" is infinite and replaced by nan'.format(key))
+                    LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by nan'.format(key))
 
         except ValueError as ex:
             LOGGER.exception('Failed to compute meta-features. Fallback to empty meta-features', ex)
