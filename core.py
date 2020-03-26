@@ -75,7 +75,7 @@ class Core(object):
         self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
         self.cache_percentage = cache_percentage
 
-    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, budget: int, name: str = None):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, name: str = None):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
