@@ -310,8 +310,11 @@ class MetaFeatures(object):
         # noinspection PyTypeChecker
         # TODO pymfe seems to be unable to handle missing values
         # Example dataset: https://www.openml.org/d/24
+        transform_cat = True
+        if np.any(pd.isna(X)):
+            transform_cat = False
 
-        mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=False)
+        mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=transform_cat)
         f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
         """
