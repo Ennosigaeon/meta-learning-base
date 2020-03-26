@@ -6,6 +6,6 @@ username: 'postgres'
 password: 'usu4867!'  # gcloud
 
 # host: 'localhost'  # local
-host: '35.246.228.109'  # gcloud
+host: '10.156.0.3'  # gcloud
 
 port: 5432
