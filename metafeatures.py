@@ -1,14 +1,115 @@
-import math
+from abc import ABCMeta, abstractmethod
+from datetime import time
+import time
+
 from collections import defaultdict
 
 import logging
 import numpy as np
 import pandas as pd
-from autosklearn.metalearning.metafeatures.metafeature import MetaFeature
+import scipy.sparse
 from pymfe.mfe import MFE
 
 LOGGER = logging.getLogger('mlb')
 
+def _create_logger(name):
+    return logging.getLogger(name)
+
+class PickableLoggerAdapter(object):
+
+    def __init__(self, name):
+        self.name = name
+        self.logger = _create_logger(name)
+
+    def __getstate__(self):
+        """
+        Method is called when pickle dumps an object.
+
+        Returns
+        -------
+        Dictionary, representing the object state to be pickled. Ignores
+        the self.logger field and only returns the logger name.
+        """
+        return { 'name': self.name }
+
+    def __setstate__(self, state):
+        """
+        Method is called when pickle loads an object. Retrieves the name and
+        creates a logger.
+
+        Parameters
+        ----------
+        state - dictionary, containing the logger name.
+
+        """
+        self.name = state['name']
+        self.logger = _create_logger(self.name)
+
+def get_logger(name):
+    logger = PickableLoggerAdapter(name)
+    return logger
+
+class MetaFeatureValue(object):
+    def __init__(self, name, type_, fold, repeat, value, time, comment=""):
+        self.name = name
+        self.type_ = type_
+        self.fold = fold
+        self.repeat = repeat
+        self.value = value
+        self.time = time
+        self.comment = comment
+
+    def to_arff_row(self):
+        if self.type_ == "METAFEATURE":
+            value = self.value
+        else:
+            value = "?"
+
+        return [self.name, self.type_, self.fold,
+                self.repeat, value, self.time, self.comment]
+
+    def __repr__(self):
+        repr = "%s (type: %s, fold: %d, repeat: %d, value: %s, time: %3.3f, " \
+               "comment: %s)"
+        repr = repr % tuple(self.to_arff_row()[:4] +
+                            [str(self.to_arff_row()[4])] +
+                            self.to_arff_row()[5:])
+        return repr
+
+class AbstractMetaFeature(object):
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def __init__(self):
+        self.logger = get_logger(__name__)
+
+    @abstractmethod
+    def _calculate(cls, X, y, categorical):
+        pass
+
+    def __call__(self, X, y, categorical=None):
+        if categorical is None:
+            categorical = [False for i in range(X.shape[1])]
+        starttime = time.time()
+
+        try:
+            if scipy.sparse.issparse(X) and hasattr(self, "_calculate_sparse"):
+                value = self._calculate_sparse(X, y, categorical)
+            else:
+                value = self._calculate(X, y, categorical)
+            comment = ""
+        except MemoryError as e:
+            value = None
+            comment = "Memory Error"
+
+        endtime = time.time()
+        return MetaFeatureValue(self.__class__.__name__, self.type_,
+                                0, 0, value, endtime-starttime, comment=comment)
+
+class MetaFeature(AbstractMetaFeature):
+    def __init__(self):
+        super(MetaFeature, self).__init__()
+        self.type_ = "METAFEATURE"
 
 class NumberOfMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):

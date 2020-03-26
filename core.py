@@ -47,6 +47,7 @@ class Core(object):
             work_dir: str = None,
             timeout: int = None,
             cache_percentage: float = 0.8,
+            dataset_budget: int = None,
 
             # S3 Conf
             endpoint: str = None,
@@ -61,6 +62,7 @@ class Core(object):
         self.db = Database(dialect, database, username, password, host, port, query)
         self.work_dir = work_dir
         self.timeout = timeout
+        self.dataset_budget = dataset_budget
         self.s3_endpoint: str = endpoint
         self.s3_bucket: str = bucket
         self.s3_access_key: str = access_key
@@ -73,7 +75,7 @@ class Core(object):
         self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
         self.cache_percentage = cache_percentage
 
-    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, name: str = None):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, budget: int, name: str = None):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
@@ -88,6 +90,8 @@ class Core(object):
 
             depth (int):
                 The max pipeline depth a dataset can reach.
+
+            budget (int):
 
         """
 
@@ -108,7 +112,7 @@ class Core(object):
                 return ds
 
         """Uploads input dataset to cloud"""
-        upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
+        # upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
 
         """Calculates metafeatures for input dataset"""
         try:
@@ -130,6 +134,7 @@ class Core(object):
             name=name,
             class_column=class_column,
             depth=depth,
+            budget=self.dataset_budget,
             hashcode=hashcode,
             **mf
         )

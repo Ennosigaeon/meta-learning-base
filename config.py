@@ -141,6 +141,7 @@ class DatasetConfig(Config):
     }
 
 
+
 class SQLConfig(Config):
     """ Stores configuration for SQL database setup & connection """
     _PREFIX = 'sql'
@@ -179,8 +180,12 @@ class GenericConfig(Config):
         'default': '/data/disk1/',  # gcloud
         'required': False
     }
+    dataset_budget = {
+        'help': 'Sets dataset budget',
+        'default': 5
+    }
     timeout = {
         'help': 'Time in seconds to execute a single algorithm',
-        'default': 7200,
+        'default': 1800,
         'required': False
     }
