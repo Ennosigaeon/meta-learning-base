@@ -81,7 +81,7 @@ class Dataset(Base):
     class_column = Column(String(100))
 
     train_path = Column(String, nullable=False)
-    status = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False, index=True)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     processed = Column(Integer)
@@ -249,7 +249,7 @@ class Algorithm(Base):
     Algorithm columns
     """
     algorithm = Column(String(300), nullable=False)
-    status = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False, index=True)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     error_message = Column(Text)
