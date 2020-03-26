@@ -1,3 +1,4 @@
+auto-sklearn==0.6.0
 ConfigSpace==0.4.9
 PyYAML==3.12
 boto3==1.10.17
