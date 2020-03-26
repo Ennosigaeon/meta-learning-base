@@ -112,7 +112,7 @@ class Core(object):
                 return ds
 
         """Uploads input dataset to cloud"""
-        # upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
+        upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
 
         """Calculates metafeatures for input dataset"""
         try:
