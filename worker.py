@@ -172,15 +172,6 @@ class Worker(object):
             depth = self.dataset.depth
             depth += 1
             self.core.add_dataset(new_dataset, class_column, depth=depth, budget=self.dataset.budget)
-            # TODO check this error. Should not happen
-            # Traceback (most recent call last):
-            #   File "/mnt/c/local/phd/code/meta-learning-base/worker.py", line 151, in save_algorithm
-            #     assert_frame_equal(res[0], input_df)
-            #   File "/usr/local/lib/python3.6/dist-packages/pandas/util/testing.py", line 1458, in assert_frame_equal
-            #     '{shape!r}'.format(shape=right.shape))
-            #   File "/usr/local/lib/python3.6/dist-packages/pandas/util/testing.py", line 1094, in raise_assert_detail
-            #     raise AssertionError(msg)
-            # AssertionError: DataFrame are different
 
     def is_dataset_finished(self):
         """

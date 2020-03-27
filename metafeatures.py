@@ -36,7 +36,7 @@ class PickableLoggerAdapter(object):
         Dictionary, representing the object state to be pickled. Ignores
         the self.logger field and only returns the logger name.
         """
-        return { 'name': self.name }
+        return {'name': self.name}
 
     def __setstate__(self, state):
         """
@@ -113,7 +113,7 @@ class AbstractMetaFeature(object):
 
         endtime = time.time()
         return MetaFeatureValue(self.__class__.__name__, self.type_,
-                                0, 0, value, endtime-starttime, comment=comment)
+                                0, 0, value, endtime - starttime, comment=comment)
 
 
 class MetaFeature(AbstractMetaFeature):

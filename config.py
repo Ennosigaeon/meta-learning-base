@@ -141,7 +141,6 @@ class DatasetConfig(Config):
     }
 
 
-
 class SQLConfig(Config):
     """ Stores configuration for SQL database setup & connection """
     _PREFIX = 'sql'
