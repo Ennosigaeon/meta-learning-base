@@ -73,10 +73,13 @@ class Dataset(Base):
 
     # TODO set index on appropriate columns
 
+    HybridType = Integer()
+    HybridType = HybridType.with_variant(BigInteger(), 'postgresql')
+
     """
     Columns necessary for loading/processing data
     """
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(HybridType, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     class_column = Column(String(100))
 
@@ -239,11 +242,14 @@ class Dataset(Base):
 class Algorithm(Base):
     __tablename__ = 'algorithms'
 
+    HybridType = Integer()
+    HybridType = HybridType.with_variant(BigInteger(), 'postgresql')
+
     """
     Relational columns
     """
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    dataset_id = Column(BigInteger, ForeignKey('datasets.id'), nullable=False)
+    id = Column(HybridType, primary_key=True, autoincrement=True)
+    dataset_id = Column(HybridType, ForeignKey('datasets.id'), nullable=False)
 
     """
     Algorithm columns
