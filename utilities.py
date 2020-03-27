@@ -24,13 +24,13 @@ def hash_file(fname: str, buf_size: int = 1048576):
     return sha1.hexdigest()
 
 
-def object_to_base_64(obj):
+def object_to_base_64(obj) -> str:
     """ Pickle and base64-encode an object. """
     pickled = pickle.dumps(obj)
-    return base64.b64encode(pickled)
+    return base64.b64encode(pickled).decode('utf-8')
 
 
-def base_64_to_object(b64str):
+def base_64_to_object(b64str: str):
     """
     Inverse of object_to_base_64.
     Decode base64-encoded string and then unpickle it.
