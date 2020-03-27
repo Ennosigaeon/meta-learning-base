@@ -71,8 +71,6 @@ Base = declarative_base()
 class Dataset(Base):
     __tablename__ = 'datasets'
 
-    # TODO set index on appropriate columns
-
     HybridType = Integer()
     HybridType = HybridType.with_variant(BigInteger(), 'postgresql')
 
@@ -275,11 +273,6 @@ class Algorithm(Base):
     recall = Column(Numeric(precision=20, scale=10))
     neg_log_loss = Column(Numeric(precision=20, scale=10))
     roc_auc_score = Column(Numeric(precision=20, scale=10))
-
-    # TODO do we still need cross validation score as evaluation metric?
-    # cv_judgment_metric = Column(Numeric(precision=20, scale=10))
-    # cv_judgment_metric_stdev = Column(Numeric(precision=20, scale=10))
-    # test_judgment_metric = Column(Numeric(precision=20, scale=10))
 
     """
     Hostname

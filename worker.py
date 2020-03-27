@@ -172,15 +172,6 @@ class Worker(object):
             depth = self.dataset.depth
             depth += 1
             self.core.add_dataset(new_dataset, class_column, depth=depth, budget=self.dataset.budget)
-            # TODO check this error. Should not happen
-            # Traceback (most recent call last):
-            #   File "/mnt/c/local/phd/code/meta-learning-base/worker.py", line 151, in save_algorithm
-            #     assert_frame_equal(res[0], input_df)
-            #   File "/usr/local/lib/python3.6/dist-packages/pandas/util/testing.py", line 1458, in assert_frame_equal
-            #     '{shape!r}'.format(shape=right.shape))
-            #   File "/usr/local/lib/python3.6/dist-packages/pandas/util/testing.py", line 1094, in raise_assert_detail
-            #     raise AssertionError(msg)
-            # AssertionError: DataFrame are different
 
     def is_dataset_finished(self):
         """
@@ -280,23 +271,11 @@ class Worker(object):
             elif wrapper.exit_status is pynisher2.MemorylimitException:
                 raise MemoryError('MemoryLimit')
             elif wrapper.exit_status is pynisher2.AnythingException:
-                # TODO res can be None
-                # 2020-03-10 22:33:35,680 - 4324 - ERROR - worker - Unexpected error testing algorithm: dataset=<5bcfaa17-0bc1-4722-986f-2f579a901cda: 2.0000000000 classes, 145.0000000000 features, 2984.0000000000 rows>
-                # Traceback (most recent call last):
-                #   File "/mnt/c/local/phd/code/meta-learning-base/worker.py", line 266, in run_algorithm
-                #     raise pynisher2.AnythingException(res[1])
-                # TypeError: 'NoneType' object is not subscriptable
                 raise AlgorithmError(res[0], res[1])
             elif wrapper.exit_status == 0 and res is not None:
                 LOGGER.debug('Saving algorithm...')
                 self.save_algorithm(algorithm.id, res)
             else:
-                # TODO not sure how we ended in this state
-                # [ERROR] [22:40:01:mlb] Unexpected error testing algorithm: dataset=<47676e99-12f3-40a4-9b9c-9efaa3c7f53e: 2.0000000000 classes, 145.0000000000 features, 2984.0000000000 rows>
-                # Traceback (most recent call last):
-                #   File "/mnt/c/local/phd/code/meta-learning-base/worker.py", line 271, in run_algorithm
-                #     raise ValueError('Something went wrong transforming data set {}; {}'.format(res, wrapper))
-                # ValueError: Something went wrong transforming data set None; <pynisher2.limit_function_call.enforce_limits.__call__.<locals>.function_wrapper object at 0x7f651ca5b588>
                 raise ValueError('Something went wrong transforming data set {}; {}'.format(res, wrapper.exit_status))
 
         except KeyboardInterrupt:
