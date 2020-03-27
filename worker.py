@@ -164,13 +164,14 @@ class Worker(object):
             assert_frame_equal(res[0], input_df)
             LOGGER.info('Transformed dataset equals input dataset {} and is not stored in the DB.'
                         .format(self.dataset.id))
-        except AssertionError:
+        except KeyboardInterrupt:
+            raise
+        except Exception:
             LOGGER.info('Transformed dataset will be stored in DB.')
             new_dataset = pd.concat([res[0], dataset_class_column], axis=1)
             depth = self.dataset.depth
             depth += 1
             self.core.add_dataset(new_dataset, class_column, depth=depth, budget=self.dataset.budget)
-        except Exception as ex:
             # TODO check this error. Should not happen
             # Traceback (most recent call last):
             #   File "/mnt/c/local/phd/code/meta-learning-base/worker.py", line 151, in save_algorithm
@@ -180,7 +181,6 @@ class Worker(object):
             #   File "/usr/local/lib/python3.6/dist-packages/pandas/util/testing.py", line 1094, in raise_assert_detail
             #     raise AssertionError(msg)
             # AssertionError: DataFrame are different
-            LOGGER.fatal('This should not happen!', ex)
 
     def is_dataset_finished(self):
         """
