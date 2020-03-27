@@ -169,7 +169,7 @@ class Worker(object):
             new_dataset = pd.concat([res[0], dataset_class_column], axis=1)
             depth = self.dataset.depth
             depth += 1
-            self.core.add_dataset(new_dataset, class_column, depth=depth)
+            self.core.add_dataset(new_dataset, class_column, depth=depth, budget=self.dataset.budget)
         except Exception as ex:
             # TODO check this error. Should not happen
             # Traceback (most recent call last):

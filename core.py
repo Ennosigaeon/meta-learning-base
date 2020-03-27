@@ -75,7 +75,7 @@ class Core(object):
         self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
         self.cache_percentage = cache_percentage
 
-    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, name: str = None):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, budget: int = None, name: str = None):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
@@ -129,12 +129,15 @@ class Core(object):
         LOGGER.debug('Extracted Metafeatures')
         """Saves input dataset and calculated metafeatures to db"""
         LOGGER.info('Creating dataset {}'.format(name))
+        if budget is None:
+            budget = self.dataset_budget
+
         return self.db.create_dataset(
             train_path=local_file,
             name=name,
             class_column=class_column,
             depth=depth,
-            budget=self.dataset_budget,
+            budget=budget,
             hashcode=hashcode,
             **mf
         )

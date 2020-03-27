@@ -12,8 +12,14 @@ from pymfe.mfe import MFE
 
 LOGGER = logging.getLogger('mlb')
 
+
+# ##########################################################################
+# #  Help Functions Copied From AutoSklearn  ###############################
+# ##########################################################################
+
 def _create_logger(name):
     return logging.getLogger(name)
+
 
 class PickableLoggerAdapter(object):
 
@@ -45,9 +51,11 @@ class PickableLoggerAdapter(object):
         self.name = state['name']
         self.logger = _create_logger(self.name)
 
+
 def get_logger(name):
     logger = PickableLoggerAdapter(name)
     return logger
+
 
 class MetaFeatureValue(object):
     def __init__(self, name, type_, fold, repeat, value, time, comment=""):
@@ -75,6 +83,7 @@ class MetaFeatureValue(object):
                             [str(self.to_arff_row()[4])] +
                             self.to_arff_row()[5:])
         return repr
+
 
 class AbstractMetaFeature(object):
     __metaclass__ = ABCMeta
@@ -106,10 +115,16 @@ class AbstractMetaFeature(object):
         return MetaFeatureValue(self.__class__.__name__, self.type_,
                                 0, 0, value, endtime-starttime, comment=comment)
 
+
 class MetaFeature(AbstractMetaFeature):
     def __init__(self):
         super(MetaFeature, self).__init__()
         self.type_ = "METAFEATURE"
+
+
+# ##########################################################################
+# #  Extracting MetaFeatures with the help of AutoSklearn  #################
+# ##########################################################################
 
 class NumberOfMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
@@ -467,7 +482,7 @@ class MetaFeatures(object):
             naive_bayes_sd = float(f_value[f_name.index('naive_bayes')])
 
         # ##########################################################################
-        # #  Extracting Meta Features with Auto-Sklearn  ###########################
+        # #  Extracting Meta Features with AutoSklearn  ############################
         # ##########################################################################
 
         nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value

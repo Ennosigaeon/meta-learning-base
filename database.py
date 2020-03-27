@@ -8,7 +8,7 @@ from ConfigSpace.configuration_space import Configuration
 from builtins import object
 from datetime import datetime
 from sklearn.base import BaseEstimator
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine, BigInteger
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -76,7 +76,7 @@ class Dataset(Base):
     """
     Columns necessary for loading/processing data
     """
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     class_column = Column(String(100))
 
@@ -242,8 +242,8 @@ class Algorithm(Base):
     """
     Relational columns
     """
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    dataset_id = Column(Integer, ForeignKey('datasets.id'), nullable=False)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    dataset_id = Column(BigInteger, ForeignKey('datasets.id'), nullable=False)
 
     """
     Algorithm columns

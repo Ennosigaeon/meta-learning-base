@@ -49,7 +49,7 @@ def _enter_data(args):
 
     class_column = dataset_conf.class_column
 
-    dataset = core.add_dataset(df, class_column, 0, dataset_conf.name)
+    dataset = core.add_dataset(df, class_column, depth=0, name=dataset_conf.name)
 
     return dataset.id
 
