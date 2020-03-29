@@ -277,9 +277,12 @@ class Worker(object):
 
         except KeyboardInterrupt:
             raise
-        except (TimeoutError, MemoryError) as ex:
-            LOGGER.info('Algorithm violated constraints: {}'.format(str(ex)))
-            self.db.mark_algorithm_errored(algorithm.id, error_message=str(ex))
+        except TimeoutError as ex:
+            LOGGER.info('Algorithm violated time constraints: '.format(str(ex)))
+            self.db.mark_algorithm_errored(algorithm.id, error_message='Timeout: '.format(str(ex)))
+        except MemoryError as ex:
+            LOGGER.info('Algorithm violated memory constraints: '.format(str(ex)))
+            self.db.mark_algorithm_errored(algorithm.id, error_message='MemoryLimit: '.format(str(ex)))
         except AlgorithmError as ex:
             LOGGER.info('Algorithm raised exception: {}'.format(str(ex)))
             self.db.mark_algorithm_errored(algorithm.id, error_message=ex.details)
