@@ -281,7 +281,7 @@ class Worker(object):
             LOGGER.info('Algorithm violated constraints: {}'.format(str(ex)))
             self.db.mark_algorithm_errored(algorithm.id, error_message=str(ex))
         except AlgorithmError as ex:
-            LOGGER.info('Algorithm raised exception: {}'.format(ex.details))
+            LOGGER.info('Algorithm raised exception: {}'.format(str(ex)))
             self.db.mark_algorithm_errored(algorithm.id, error_message=ex.details)
         except Exception:
             msg = traceback.format_exc()
