@@ -11,6 +11,7 @@ import random
 from operator import attrgetter
 
 import pandas as pd
+import numpy as np
 import shutil
 import signal
 import time
@@ -118,7 +119,7 @@ class Core(object):
 
             for key, value in mf.items():
                 if math.isinf(value):
-                    mf[key] = float('NaN')
+                    mf[key] = np.nan
                     LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by nan'.format(key))
         except MemoryError as ex:
             LOGGER.exception('Meta-Feature calculation ran out of memory. Fallback to empty meta-features', ex)

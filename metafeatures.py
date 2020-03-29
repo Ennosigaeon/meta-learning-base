@@ -312,6 +312,63 @@ class MetaFeatures(object):
         """
         X, y = df.drop(class_column, axis=1), df[class_column]
 
+        if X.shape[1] == 0:
+            LOGGER.info('X has no values. Setting meta-features to default.')
+            return {
+                'nr_inst': 0,
+                'nr_attr': 0,
+                'nr_class': 0,
+                'nr_missing_values': np.nan,
+                'pct_missing_values': np.nan,
+                'nr_inst_mv': np.nan,
+                'pct_inst_mv': np.nan,
+                'nr_attr_mv': np.nan,
+                'pct_attr_mv': np.nan,
+                'nr_outliers': 0,
+
+                'skewness_mean': np.nan,
+                'skewness_sd': np.nan,
+                'kurtosis_mean': np.nan,
+                'kurtosis_sd': np.nan,
+                'cor_mean': np.nan,
+                'cor_sd': np.nan,
+                'cov_mean': np.nan,
+                'cov_sd': np.nan,
+                'sparsity_mean': np.nan,
+                'sparsity_sd': np.nan,
+                'var_mean': np.nan,
+                'var_sd': np.nan,
+
+                'class_prob_mean': np.nan,
+                'class_prob_std': np.nan,
+                'class_ent': np.nan,
+                'attr_ent_mean': np.nan,
+                'attr_ent_sd': np.nan,
+                'mut_inf_mean': np.nan,
+                'mut_inf_sd': np.nan,
+                'eq_num_attr': np.nan,
+                'ns_ratio': np.nan,
+
+                'nodes': np.nan,
+                'leaves': np.nan,
+                'leaves_branch_mean': np.nan,
+                'leaves_branch_sd': np.nan,
+                'nodes_per_attr': np.nan,
+                'leaves_per_class_mean': np.nan,
+                'leaves_per_class_sd': np.nan,
+                'var_importance_mean': np.nan,
+                'var_importance_sd': np.nan,
+
+                'one_nn_mean': np.nan,
+                'one_nn_sd': np.nan,
+                'best_node_mean': np.nan,
+                'best_node_sd': np.nan,
+                'linear_discr_mean': np.nan,
+                'linear_discr_sd': np.nan,
+                'naive_bayes_mean': np.nan,
+                'naive_bayes_sd': np.nan
+            }
+
         """
         Selects Meta Features and extracts them
         """
@@ -322,9 +379,6 @@ class MetaFeatures(object):
                              'naive_bayes', 'leaves_per_class']),
                   random_state=random_state)
 
-        # noinspection PyTypeChecker
-        # TODO pymfe seems to be unable to handle missing values
-        # Example dataset: https://www.openml.org/d/24
         transform_cat = True
         if np.any(pd.isna(X)):
             transform_cat = False
