@@ -1,14 +1,14 @@
 import logging
 import os
-import time
-from typing import Tuple
 
-import boto3
-import botocore
 import openml
 import pandas as pd
-from botocore.client import BaseClient
-from botocore.exceptions import ClientError
+import time
+from google.api_core.exceptions import GoogleAPICallError
+from google.cloud import storage
+from google.cloud.exceptions import NotFound
+from google.cloud.storage import Client
+from typing import Tuple
 
 from config import DatasetConfig
 
@@ -31,31 +31,30 @@ def load_openml(dataset_conf: DatasetConfig) -> pd.DataFrame:
     return df
 
 
-def load_data(path: str, s3_endpoint: str = None, s3_bucket: str = None, s3_access_key: str = None,
-              s3_secret_key: str = None, name: str = None) -> pd.DataFrame:
+def load_data(path: str, s3_config: str = None, s3_bucket: str = None, name: str = None) -> pd.DataFrame:
     if not os.path.isfile(path):
-        if s3_access_key is None:
+        if s3_config is None:
             raise FileNotFoundError(f'{path} does not exist')
         else:
-            client = boto3.client(
-                's3',
-                endpoint_url=s3_endpoint,
-                aws_access_key_id=s3_access_key,
-                aws_secret_access_key=s3_secret_key,
-            )
-
+            LOGGER.info('Downloading {}'.format(path))
             try:
-                LOGGER.info('Downloading {}'.format(path))
-                client.download_file(s3_bucket, '{}.parquet'.format(name), path)
-            except ClientError as e:
-                LOGGER.error('An error occurred trying to download from AWS3.'
+                client: Client = storage.Client.from_service_account_json(s3_config)
+                bucket = client.get_bucket(s3_bucket)
+                blob = bucket.get_blob('{}.parquet'.format(name))
+                if blob is None:
+                    raise FileNotFoundError('File {} does not exist'.format(path))
+
+                with open(path, 'wb') as f:
+                    blob.download_to_file(f)
+
+            except GoogleAPICallError as e:
+                LOGGER.error('An error occurred trying to download from Google Storage.'
                              'The following error has been returned: {}'.format(e))
 
     return pd.read_parquet(path)
 
 
 def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
-
     path = os.path.join(work_dir, name) + '.parquet'
     LOGGER.debug('Saving dataframe locally in {}'.format(path))
 
@@ -74,7 +73,6 @@ def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
 
 
 def delete_data(train_path: str):
-
     try:
         if os.path.exists(train_path):
             os.remove(train_path)
@@ -84,36 +82,30 @@ def delete_data(train_path: str):
         LOGGER.warning('Unable to delete {}'.format(train_path))
 
 
-def upload_data(input_file: str, s3_endpoint: str, s3_bucket: str, s3_access_key: str, s3_secret_key: str,
-                name: str = None) -> Tuple[str, str]:
+def upload_data(input_file: str, s3_config: str, s3_bucket: str, name: str = None) -> Tuple[str, str]:
     # S3 Storage is disabled
-    if s3_endpoint is None or s3_bucket is None or s3_secret_key is None or s3_access_key is None:
+    if s3_config is None or s3_bucket is None:
         return input_file, input_file
 
-    client: BaseClient = boto3.client(
-        's3',
-        endpoint_url=s3_endpoint,
-        aws_access_key_id=s3_access_key,
-        aws_secret_access_key=s3_secret_key,
-    )
+    client: Client = storage.Client.from_service_account_json(s3_config)
 
     """Checks if s3_bucket already exists. If not call create_bucket"""
     try:
-        client.head_bucket(Bucket=s3_bucket)
-    except botocore.exceptions.ClientError as e:
-        # If a client error is thrown, then check that it was a 404 error.
-        # If it was a 404 error, then the bucket does not exist.
-        error_code = e.response['Error']['Code']
-        if error_code == '404':
-            client.create_bucket(Bucket=s3_bucket)
+        client.get_bucket(s3_bucket)
+    except NotFound:
+        client.create_bucket(s3_bucket)
 
     if name is None:
         name = input_file.split('/')[-1]
     try:
         LOGGER.debug('Uploading {} to S3'.format(input_file))
-        client.upload_file(input_file, s3_bucket, '{}.parquet'.format(name))
-        remote_path = "{0}/{1}/{2}".format(s3_endpoint, s3_bucket, name)
+
+        bucket = client.get_bucket(s3_bucket)
+        blob = bucket.blob('{}.parquet'.format(name))
+        blob.upload_from_filename(input_file)
+
+        remote_path = "{0}/{1}".format(s3_bucket, name)
         return input_file, remote_path
-    except ClientError as e:
-        LOGGER.error('An error occurred trying to upload to AWS3.'
+    except GoogleAPICallError as e:
+        LOGGER.error('An error occurred trying to upload to Google Storage.'
                      'The following error has been returned: {}'.format(e))

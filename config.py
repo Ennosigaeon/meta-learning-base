@@ -118,9 +118,7 @@ class S3Config(Config):
     """ Stores configuration for AWS S3 connections """
     _PREFIX = 's3'
 
-    endpoint = 'S3 endpoint'
-    access_key = 'S3 access key'
-    secret_key = 'S3 secret key'
+    service_account = 'Service account information for S3'
     bucket = 'S3 bucket to store data'
 
 

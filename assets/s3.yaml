@@ -1,10 +1,2 @@
-#endpoint: 'http://localhost:9090'  # local
-#access_key: 'access_key'
-#secret_key: 'usu4867!'
-
-
-
-endpoint: 'https://storage.googleapis.com'
-access_key: 'GOOG1EBDMMEA6YO6ULRUADSJALUP43YAWB4MTG6IK5GH664Z4JE2JKLCEKXQY'
-secret_key: '6K+S4v05r69kjE7BEJMXacZIO31Z9KOFs1eFrLaR'
-bucket: 'usu-mlb'
+service_account: 'assets/limbo-233520-a283e9f868c1.json'
+bucket: 'usu-mlb-test'

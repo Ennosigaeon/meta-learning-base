@@ -50,10 +50,8 @@ class Core(object):
             dataset_budget: int = None,
 
             # S3 Conf
-            endpoint: str = None,
+            service_account: str = None,
             bucket: str = None,
-            access_key: str = None,
-            secret_key: str = None,
 
             # Log Conf
             verbose_metrics: bool = False,
@@ -63,10 +61,8 @@ class Core(object):
         self.work_dir = work_dir
         self.timeout = timeout
         self.dataset_budget = dataset_budget
-        self.s3_endpoint: str = endpoint
+        self.s3_config: str = service_account
         self.s3_bucket: str = bucket
-        self.s3_access_key: str = access_key
-        self.s3_secret_key: str = secret_key
 
         self.verbose_metrics: bool = verbose_metrics
         self._abort = False
@@ -106,13 +102,13 @@ class Core(object):
         hashcode = hash_file(local_file)
         similar_datasets: List[Dataset] = self.db.get_dataset_by_hash(hashcode)
         for ds in similar_datasets:
-            df_old = ds.load(self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
+            df_old = ds.load(self.s3_config, self.s3_bucket)
             if df.equals(df_old):
                 LOGGER.info('New dataset equals dataset {} and is not stored in the DB.'.format(ds.id))
                 return ds
 
         """Uploads input dataset to cloud"""
-        upload_data(local_file, self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key, name)
+        upload_data(local_file, self.s3_config, self.s3_bucket, name)
 
         """Calculates metafeatures for input dataset"""
         try:
@@ -239,8 +235,7 @@ class Core(object):
                 pbar = tqdm(total=ds.budget, ascii=True, initial=ds.processed, disable=not verbose)
 
                 """Creates Worker"""
-                worker = Worker(self.db, ds, self, timeout=self.timeout, s3_endpoint=self.s3_endpoint,
-                                s3_access_key=self.s3_access_key, s3_secret_key=self.s3_secret_key,
+                worker = Worker(self.db, ds, self, timeout=self.timeout, s3_config=self.s3_config,
                                 s3_bucket=self.s3_bucket, verbose_metrics=self.verbose_metrics)
 
                 """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""

@@ -146,8 +146,8 @@ class Dataset(Base):
     naive_bayes_mean = Column(Numeric)
     naive_bayes_sd = Column(Numeric)
 
-    def load(self, s3_endpoint: str = None, s3_bucket: str = None, s3_access_key=None, s3_secret_key=None):
-        return load_data(self.train_path, s3_endpoint, s3_bucket, s3_access_key, s3_secret_key, self.name)
+    def load(self, s3_config: str = None, s3_bucket: str = None):
+        return load_data(self.train_path, s3_config, s3_bucket, self.name)
 
     @staticmethod
     def _make_name(path):

@@ -53,9 +53,7 @@ class Worker(object):
                  dataset,
                  core,
                  timeout: int = None,
-                 s3_endpoint: str = None,
-                 s3_access_key: str = None,
-                 s3_secret_key: str = None,
+                 s3_config: str = None,
                  s3_bucket: str = None,
 
                  max_pipeline_depth: int = 5,
@@ -66,9 +64,7 @@ class Worker(object):
         self.core: Core = core
         self.timeout = timeout
 
-        self.s3_endpoint = s3_endpoint
-        self.s3_access_key = s3_access_key
-        self.s3_secret_key = s3_secret_key
+        self.s3_config = s3_config
         self.s3_bucket = s3_bucket
 
         self.max_pipeline_depth = max_pipeline_depth
@@ -88,7 +84,7 @@ class Worker(object):
         """
 
         """Load input dataset and class_column"""
-        df = self.dataset.load(self.s3_endpoint, self.s3_bucket, self.s3_access_key, self.s3_secret_key)
+        df = self.dataset.load(self.s3_config, self.s3_bucket)
         class_column = self.dataset.class_column
 
         """Split input dataset in X and y"""
@@ -151,6 +147,7 @@ class Worker(object):
         """
 
         """Load input dataset and class_column. Drop class_column from input dataset."""
+        # S3 config is not necessary as file exists locally
         input_df = self.dataset.load()
         class_column = self.dataset.class_column
         input_df, dataset_class_column = input_df.drop(class_column, axis=1), input_df[class_column]
