@@ -94,6 +94,7 @@ class Core(object):
         """Generate name using a random uuid, if input dataset has no name"""
         if not name or name.strip() == '':
             name = str(uuid.uuid4())
+        LOGGER.info('Creating dataset {}'.format(name))
 
         """Stores input dataset to local working directory"""
         local_file = self._cache_locally(df, name)
@@ -111,6 +112,7 @@ class Core(object):
         upload_data(local_file, self.s3_config, self.s3_bucket, name)
 
         """Calculates metafeatures for input dataset"""
+        LOGGER.info('Extracting meta-features...')
         try:
             mf = self.metafeatures.calculate(df=df, class_column=class_column)
 
@@ -118,13 +120,14 @@ class Core(object):
                 if math.isinf(value):
                     mf[key] = float('NaN')
                     LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by nan'.format(key))
-
+        except MemoryError as ex:
+            LOGGER.exception('Meta-Feature calculation ran out of memory. Fallback to empty meta-features', ex)
+            mf = {}
         except ValueError as ex:
             LOGGER.exception('Failed to compute meta-features. Fallback to empty meta-features', ex)
             mf = {}
-        LOGGER.debug('Extracted Metafeatures')
+
         """Saves input dataset and calculated metafeatures to db"""
-        LOGGER.info('Creating dataset {}'.format(name))
         if budget is None:
             budget = self.dataset_budget
 
