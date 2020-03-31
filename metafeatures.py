@@ -312,8 +312,8 @@ class MetaFeatures(object):
         """
         X, y = df.drop(class_column, axis=1), df[class_column]
 
-        if X.shape[1] == 0:
-            LOGGER.info('X has no values. Setting meta-features to default.')
+        if X.shape[0] == 0 or X.shape[1] == 0:
+            LOGGER.info('X has no samples or features. Setting meta-features to default.')
             return {
                 'nr_inst': 0,
                 'nr_attr': 0,
