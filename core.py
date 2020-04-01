@@ -3,15 +3,14 @@
 This module contains the Core class, which is the one responsible for
 executing and orchestrating the main Core functionalities.
 """
-from datetime import datetime
 import logging
-import math
 import os
 import random
 from operator import attrgetter
 
-import pandas as pd
+import math
 import numpy as np
+import pandas as pd
 import shutil
 import signal
 import time
@@ -72,7 +71,8 @@ class Core(object):
         self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
         self.cache_percentage = cache_percentage
 
-    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, budget: int = None, name: str = None):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, budget: int = None, name: str = None,
+                    max_features: int = 10000):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
@@ -89,7 +89,7 @@ class Core(object):
                 The max pipeline depth a dataset can reach.
 
             budget (int):
-
+            max_features:
         """
 
         """Generate name using a random uuid, if input dataset has no name"""
@@ -112,33 +112,23 @@ class Core(object):
         """Uploads input dataset to cloud"""
         upload_data(local_file, self.s3_config, self.s3_bucket, name)
 
-        """Checks if number of features is bigger than 10000. Creates dataset with status skipped"""
-        if df.shape[1] > 10000:
-            nr_attr = df.shape[1]
-            nr_inst = df.shape[0]
-            return self.db.create_dataset(
-                train_path=local_file,
-                name=name,
-                class_column=class_column,
-                depth=depth,
-                budget=0,
-                hashcode=hashcode,
-                start_time=datetime.now(),
-                end_time=datetime.now(),
-                status=RunStatus.SKIPPED,
-                nr_inst=nr_inst,
-                nr_attr=nr_attr
-            )
-
         """Calculates metafeatures for input dataset"""
         LOGGER.info('Extracting meta-features...')
         try:
-            mf = self.metafeatures.calculate(df=df, class_column=class_column)
+            """Checks if number of features is bigger than 10000. Creates dataset with status skipped"""
+            if df.shape[1] > max_features:
+                mf = {
+                    'nr_inst': df.shape[0],
+                    'nr_attr': df.shape[1],
+                    'status': RunStatus.SKIPPED
+                }
+            else:
+                mf = self.metafeatures.calculate(df=df, class_column=class_column)
 
-            for key, value in mf.items():
-                if math.isinf(value):
-                    mf[key] = np.nan
-                    LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by nan'.format(key))
+                for key, value in mf.items():
+                    if math.isinf(value):
+                        mf[key] = np.nan
+                        LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by nan'.format(key))
         except MemoryError as ex:
             LOGGER.exception('Meta-Feature calculation ran out of memory. Fallback to empty meta-features', ex)
             mf = {}

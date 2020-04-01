@@ -426,7 +426,7 @@ class Database(object):
             ignore_pending: if True, ignore datasets that have not been started
             ignore_running: if True, ignore datasets that are already running
             ignore_complete: if True, ignore completed datasets
-            ignore_complete: if True, ignore skipped datasets
+            ignore_skipped: if True, ignore skipped datasets
         """
 
         query = self.session.query(Dataset)
