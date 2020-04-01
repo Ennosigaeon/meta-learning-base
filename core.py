@@ -113,16 +113,18 @@ class Core(object):
         upload_data(local_file, self.s3_config, self.s3_bucket, name)
 
         """Calculates metafeatures for input dataset"""
-        LOGGER.info('Extracting meta-features...')
         try:
             """Checks if number of features is bigger than 10000. Creates dataset with status skipped"""
             if df.shape[1] > max_features:
+                LOGGER.info('Number of features is bigger then {}. Creating dataset with status skipped...'
+                            .format(max_features))
                 mf = {
                     'nr_inst': df.shape[0],
                     'nr_attr': df.shape[1],
                     'status': RunStatus.SKIPPED
                 }
             else:
+                LOGGER.info('Extracting meta-features...')
                 mf = self.metafeatures.calculate(df=df, class_column=class_column)
 
                 for key, value in mf.items():
