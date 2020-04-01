@@ -1,10 +1,8 @@
-from abc import ABCMeta, abstractmethod
-from datetime import time
+import logging
 import time
-
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
-import logging
 import numpy as np
 import pandas as pd
 import scipy.sparse
@@ -12,10 +10,10 @@ from pymfe.mfe import MFE
 
 LOGGER = logging.getLogger('mlb')
 
-
 # ##########################################################################
 # #  Help Functions Copied From AutoSklearn  ###############################
 # ##########################################################################
+
 
 def _create_logger(name):
     return logging.getLogger(name)

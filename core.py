@@ -3,7 +3,7 @@
 This module contains the Core class, which is the one responsible for
 executing and orchestrating the main Core functionalities.
 """
-
+from datetime import datetime
 import logging
 import math
 import os
@@ -111,6 +111,24 @@ class Core(object):
 
         """Uploads input dataset to cloud"""
         upload_data(local_file, self.s3_config, self.s3_bucket, name)
+
+        """Checks if number of features is bigger than 10000. Creates dataset with status skipped"""
+        if df.shape[1] > 10000:
+            nr_attr = df.shape[1]
+            nr_inst = df.shape[0]
+            return self.db.create_dataset(
+                train_path=local_file,
+                name=name,
+                class_column=class_column,
+                depth=depth,
+                budget=0,
+                hashcode=hashcode,
+                start_time=datetime.now(),
+                end_time=datetime.now(),
+                status=RunStatus.SKIPPED,
+                nr_inst=nr_inst,
+                nr_attr=nr_attr
+            )
 
         """Calculates metafeatures for input dataset"""
         LOGGER.info('Extracting meta-features...')

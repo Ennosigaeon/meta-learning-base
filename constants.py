@@ -31,6 +31,7 @@ class RunStatus(object):
     PENDING = 'pending'
     RUNNING = 'running'
     COMPLETE = 'complete'
+    SKIPPED = 'skipped'
 
 
 # these are the strings that are used to index into results dictionaries
