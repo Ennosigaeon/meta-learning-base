@@ -417,7 +417,7 @@ class Database(object):
 
     @try_with_session()
     def get_datasets(self, ignore_pending: bool = False, ignore_running: bool = False,
-                     ignore_complete: bool = True) -> Optional[List[Dataset]]:
+                     ignore_complete: bool = True, ignore_skipped: bool = True) -> Optional[List[Dataset]]:
 
         """
         Get a list of all datasets matching the chosen filters.
@@ -426,6 +426,7 @@ class Database(object):
             ignore_pending: if True, ignore datasets that have not been started
             ignore_running: if True, ignore datasets that are already running
             ignore_complete: if True, ignore completed datasets
+            ignore_complete: if True, ignore skipped datasets
         """
 
         query = self.session.query(Dataset)
@@ -435,6 +436,8 @@ class Database(object):
             query = query.filter(Dataset.status != RunStatus.RUNNING)
         if ignore_complete:
             query = query.filter(Dataset.status != RunStatus.COMPLETE)
+        if ignore_skipped:
+            query = query.filter(Dataset.status != RunStatus.SKIPPED)
 
         datasets = query.all()
 
