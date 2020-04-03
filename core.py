@@ -46,7 +46,7 @@ class Core(object):
             # Generic Conf,
             work_dir: str = None,
             timeout: int = None,
-            cache_percentage: float = 0.8,
+            cache_percentage: float = 0.9,
             dataset_budget: int = None,
 
             # S3 Conf
