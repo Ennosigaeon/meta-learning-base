@@ -2,8 +2,6 @@ from __future__ import absolute_import, unicode_literals
 
 import hashlib
 
-import numpy as np
-import pymysql
 from ConfigSpace.configuration_space import Configuration
 from builtins import object
 from datetime import datetime
@@ -12,7 +10,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, T
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from constants import AlgorithmStatus, RunStatus
 from data import load_data
@@ -376,12 +374,6 @@ class Database(object):
         Accepts configuration for a database connection, and defines SQLAlchemy
         ORM objects for all the tables in the database.
         """
-
-        # Prepare environment for pymysql
-        pymysql.install_as_MySQLdb()
-        pymysql.converters.encoders[np.float64] = pymysql.converters.escape_float
-        pymysql.converters.conversions = pymysql.converters.encoders.copy()
-        pymysql.converters.conversions.update(pymysql.converters.decoders)
 
         db_url = URL(drivername=dialect, database=database, username=username,
                      password=password, host=host, port=port, query=query)
