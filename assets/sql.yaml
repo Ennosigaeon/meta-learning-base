@@ -1,11 +1,15 @@
+# LOKAL
+#dialect: 'postgres'
+#database: 'postgres'
+#username: 'postgres'
+#password: 'postgres'
+#host: 'localhost'
+#port: 5432
+
+# CLOUD
 dialect: 'postgres'
 database: 'postgres'
 username: 'postgres'
-
-#password: 'postgres'
-password: 'usu4867!' # gcloud
-
-#host: 'localhost'  # local
-host: '10.156.0.3'  # gcloud
-
+password: 'usu4867!'
+host: '35.242.255.138'
 port: 5432

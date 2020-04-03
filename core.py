@@ -114,7 +114,7 @@ class Core(object):
 
         """Calculates metafeatures for input dataset"""
         try:
-            """Checks if number of features is bigger than 10000. Creates dataset with status skipped"""
+            """Checks if number of features is bigger than max_features. Creates dataset with status skipped"""
             if df.shape[1] > max_features:
                 LOGGER.info('Number of features is bigger then {}. Creating dataset with status skipped...'
                             .format(max_features))
