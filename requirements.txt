@@ -6,7 +6,6 @@ openml==0.10.*
 pandas==0.24.*
 psycopg2==2.8.*
 pyarrow
-pynisher2==0.5.0
 pymfe==0.1.*
 requests==2.23.*
 scikit-learn==0.22.*
