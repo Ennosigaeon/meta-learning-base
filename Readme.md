@@ -10,17 +10,33 @@ Download other projects and install them
 ```bash
 cd ..
 git clone https://gitlab.usu-research.ml/research/automl/sklearn-components.git
-git clone https://github.com/Ennosigaeon/pynisher.git
-
+pip3 install -r sklearn-components/requirements.txt
 pip install -e sklearn-components
+
+git clone https://github.com/Ennosigaeon/pynisher.git
 pip install -e pynisher
+```
+
+Install system-packages
+```bash
+sudo apt install libpq-dev
 ```
 
 Install requirements
 ```bash
 pip3 install -r meta-learning-base/requirements.txt
-pip3 install -r sklearn-components/requirements.txt
 ```
+
+Configure virtual memory to prevent OOM killer
+```bash
+vim /etc/sysctl.conf
+
+vm.overcommit_memory=2
+vm.overcommit_ratio=100
+
+sysctl -p
+```
+
 
 ## Running the applicaion
 
@@ -32,7 +48,14 @@ where <COMMAND> can be either `enter_data` or `worker`. For additional configura
 ```bash
 python3 cli.py <COMMAND> -h
 ```
-or take a look at the [configuration](config.py).
+or take a look at the [configuration](config.py). Example execution
+```bash
+mkdir data
+mkdir logfile
+
+screen
+python3 cli.py worker --work-dir ./data -sql-config assets/sql.yaml --s3-config assets/s3.yaml --logfile ./logfiles/log`
+```
 
 ### Using external storage and database
 You can either use the provided docker-compose file to use an external database and S3 storage
@@ -41,3 +64,10 @@ docker-compose up
 ```
 or you can configure an existing db. If you want to use S3 storage, you will have to provide a google service account
 file.
+
+
+
+## Stopping a worker
+
+Get the pid of the worker via `ps aux | grep cli.py` and terminate the worker with SIGUSR1. On ubuntu this equals
+`kill -10 <PID>`. This will perform a graceful shutdown after the evaluation of the current algorithm is finished.
