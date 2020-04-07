@@ -382,11 +382,19 @@ class MetaFeatures(object):
 
             mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
             f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+
+            # Extracting Meta Features with AutoSklearn
+            nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
+            pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
+            nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
+            nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
+
         else:
-            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'class_ent']),
-                      random_state=random_state)
-            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=False)
-            f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+            # Extracting Meta Features with AutoSklearn
+            nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
+            pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
+            nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
+            nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
 
             categorical = []
             numeric = []
@@ -399,12 +407,12 @@ class MetaFeatures(object):
                     categorical.append(i)
 
             for column in numeric:
-                mean = np.mean(X.iloc[:,column])
-                strd = np.std(X.iloc[:,column])
+                mean = np.mean(X.iloc[:, column])
+                std = np.std(X.iloc[:, column])
                 nadf = X.iloc[:, column].isna()
                 for index, value in nadf.iteritems():
                     if value is True:
-                        X.iloc[index,column] = np.random.normal(mean,strd)
+                        X.iloc[index, column] = np.random.normal(mean, std)
 
             for column in categorical:
                 items = X.iloc[:, column].tolist()
@@ -415,14 +423,17 @@ class MetaFeatures(object):
                     probability.append(items.count(test) / gesamt)
                 for index, value in nadf.iteritems():
                     if value is True:
-                        X.iloc[index,column] = np.random.choice(np.unique(items), p=probability)
+                        X.iloc[index, column] = np.random.choice(np.unique(items), p=probability)
 
-            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'class_ent']),
+            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
+                                 'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
+                                 'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
+                                 'var_importance', 'one_nn', 'best_node', 'linear_discr',
+                                 'naive_bayes', 'leaves_per_class']),
                       random_state=random_state)
-            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=False)
-            x_name, x_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
-            f_name = f_name.append(x_name)
-            f_value = f_value.append(x_value)
+
+            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
+            f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
         """
         Mapping values to Meta Feature variables 7981
@@ -577,15 +588,7 @@ class MetaFeatures(object):
         # #  Extracting Meta Features with AutoSklearn  ############################
         # ##########################################################################
 
-        nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
-
-        pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
-
-        nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
-
         pct_inst_mv = (float(nr_inst_mv) / float(nr_inst)) * 100
-
-        nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
 
         pct_attr_mv = (float(nr_attr_mv) / float(nr_attr)) * 100
 
