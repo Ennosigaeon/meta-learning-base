@@ -372,68 +372,37 @@ class MetaFeatures(object):
         Selects Meta Features and extracts them
         """
 
-        if not np.any(pd.isna(X)):
-            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
-                                 'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
-                                 'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
-                                 'var_importance', 'one_nn', 'best_node', 'linear_discr',
-                                 'naive_bayes', 'leaves_per_class']),
-                      random_state=random_state)
-
-            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
-            f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
-
-            # Extracting Meta Features with AutoSklearn
-            nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
-            pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
-            nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
-            nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
-
-        else:
-            # Extracting Meta Features with AutoSklearn
-            nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
-            pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
-            nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
-            nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
-
-            categorical = []
-            numeric = []
-
-            for i in range(X.shape[1]):
+        if np.any(pd.isna(X)):
+            X_2 = X.copy()
+            n = X_2.shape[0]
+            for i in range(X_2.shape[1]):
+                col = X_2.iloc[:, i]
                 try:
-                    X.iloc[:, i].values.astype(float)
-                    numeric.append(i)
+                    col.values.astype(float)
+                    filler = np.random.normal(col.mean(), col.std(), n)
+                    X_2.iloc[:, i] = col.combine_first(filler)
                 except ValueError:
-                    categorical.append(i)
+                    items = col.unique()
+                    probability = col.value_count() / n
+                    filler = np.random.choice(items, n, p=probability)
+                    X_2.iloc[:, i] = col.combine_first(filler)
+        else:
+            X_2 = X
 
-            for column in numeric:
-                mean = np.mean(X.iloc[:, column])
-                std = np.std(X.iloc[:, column])
-                nadf = X.iloc[:, column].isna()
-                for index, value in nadf.iteritems():
-                    if value is True:
-                        X.iloc[index, column] = np.random.normal(mean, std)
+        mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
+                             'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
+                             'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
+                             'var_importance', 'one_nn', 'best_node', 'linear_discr',
+                             'naive_bayes', 'leaves_per_class']),
+                  random_state=random_state)
+        mfe.fit(X_2.to_numpy(), y.to_numpy(), transform_cat=True)
+        f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
-            for column in categorical:
-                items = X.iloc[:, column].tolist()
-                gesamt = len(X.iloc[:, column].dropna().tolist())
-                probability = []
-                nadf = X.iloc[:, column].isna()
-                for test in np.unique(items):
-                    probability.append(items.count(test) / gesamt)
-                for index, value in nadf.iteritems():
-                    if value is True:
-                        X.iloc[index, column] = np.random.choice(np.unique(items), p=probability)
-
-            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
-                                 'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
-                                 'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
-                                 'var_importance', 'one_nn', 'best_node', 'linear_discr',
-                                 'naive_bayes', 'leaves_per_class']),
-                      random_state=random_state)
-
-            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
-            f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+        # Extracting Meta Features with AutoSklearn
+        nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
+        pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
+        nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
+        nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
 
         """
         Mapping values to Meta Feature variables 7981
