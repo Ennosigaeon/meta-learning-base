@@ -371,22 +371,61 @@ class MetaFeatures(object):
         """
         Selects Meta Features and extracts them
         """
-        mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
-                             'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
-                             'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
-                             'var_importance', 'one_nn', 'best_node', 'linear_discr',
-                             'naive_bayes', 'leaves_per_class']),
-                  random_state=random_state)
 
-        transform_cat = True
-        if np.any(pd.isna(X)):
-            transform_cat = False
+        if not np.any(pd.isna(X)):
+            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
+                                 'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
+                                 'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
+                                 'var_importance', 'one_nn', 'best_node', 'linear_discr',
+                                 'naive_bayes', 'leaves_per_class']),
+                      random_state=random_state)
 
-        mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=transform_cat)
-        f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
+            f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+        else:
+            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'class_ent']),
+                      random_state=random_state)
+            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=False)
+            f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+
+            categorical = []
+            numeric = []
+
+            for i in range(X.shape[1]):
+                try:
+                    X.iloc[:, i].values.astype(float)
+                    numeric.append(i)
+                except ValueError:
+                    categorical.append(i)
+
+            for column in numeric:
+                mean = np.mean(X.iloc[:,column])
+                strd = np.std(X.iloc[:,column])
+                nadf = X.iloc[:, column].isna()
+                for index, value in nadf.iteritems():
+                    if value is True:
+                        X.iloc[index,column] = np.random.normal(mean,strd)
+
+            for column in categorical:
+                items = X.iloc[:, column].tolist()
+                gesamt = len(X.iloc[:, column].dropna().tolist())
+                probability = []
+                nadf = X.iloc[:, column].isna()
+                for test in np.unique(items):
+                    probability.append(items.count(test) / gesamt)
+                for index, value in nadf.iteritems():
+                    if value is True:
+                        X.iloc[index,column] = np.random.choice(np.unique(items), p=probability)
+
+            mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'class_ent']),
+                      random_state=random_state)
+            mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=False)
+            x_name, x_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+            f_name = f_name.append(x_name)
+            f_value = f_value.append(x_value)
 
         """
-        Mapping values to Meta Feature variables
+        Mapping values to Meta Feature variables 7981
         """
         nr_inst = int(f_value[f_name.index('nr_inst')])
         nr_attr = int(f_value[f_name.index('nr_attr')])
