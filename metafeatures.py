@@ -400,8 +400,7 @@ class MetaFeatures(object):
                              'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
                              'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
                              'var_importance', 'one_nn', 'best_node', 'linear_discr',
-                             'naive_bayes', 'leaves_per_class']),
-                  random_state=random_state)
+                             'naive_bayes', 'leaves_per_class']))
         mfe.fit(X_2.to_numpy(), y.to_numpy(), transform_cat=True)
         f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
