@@ -6,10 +6,10 @@ executing and orchestrating the main Core functionalities.
 import logging
 import os
 import random
+import sys
 from operator import attrgetter
 
 import math
-import numpy as np
 import pandas as pd
 import shutil
 import signal
@@ -130,8 +130,12 @@ class Core(object):
 
                 for key, value in mf.items():
                     if math.isinf(value):
-                        mf[key] = np.nan
-                        LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by nan'.format(key))
+                        LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by constant value'.format(key))
+                        if value > 0:
+                            mf[key] = sys.maxsize
+                        else:
+                            mf[key] = -sys.maxsize
+
         except MemoryError as ex:
             LOGGER.exception('Meta-Feature calculation ran out of memory. Fallback to empty meta-features', ex)
             mf = {}
