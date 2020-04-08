@@ -375,21 +375,21 @@ class MetaFeatures(object):
         if np.any(pd.isna(X)):
             X_2 = X.copy()
             n = X_2.shape[0]
-
-            for i in range(X_2.shape[1]):
-                col = X_2.iloc[:, i]
-                if not pd.isna(col).any:
-                    continue
-
-                if col.dtype.name in ['float64', 'float32']:
+            X_object = X.select_dtypes(include=['category', 'object', 'bool'])
+            X_numeric = X._get_numeric_data()
+            for i in X_numeric.columns:
+                col = X_2[i]
+                if pd.isna(col).any:
                     filler = np.random.normal(col.mean(), col.std(), n)
-                    X_2.iloc[:, i] = col.combine_first(pd.Series(filler))
-                elif col.dtype.name in ['category', 'object']:
+                    X_2[i] = col.combine_first(pd.Series(filler))
+            for i in X_object.columns:
+                col = X_2[i]
+                if pd.isna(col).any:
                     items = col.dropna().unique()
-                    probability = col.value_counts(dropna=True, normalize=True)
+                    probability = col.value_counts(dropna=True) / len(col.dropna())
                     probability = probability.where(probability > 0).dropna()
                     filler = np.random.choice(items, n, p=probability)
-                    X_2.iloc[:, i] = col.combine_first(pd.Series(filler))
+                    X_2[i] = col.combine_first(pd.Series(filler))
                 else:
                     raise ValueError('Unknown dtype {}'.format(col.dtype.name))
         else:
