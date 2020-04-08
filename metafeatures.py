@@ -301,7 +301,7 @@ class ClassProbabilitySTD(MetaFeature):
 class MetaFeatures(object):
 
     @staticmethod
-    def calculate(df: pd.DataFrame, class_column: str, random_state: int = 42):
+    def calculate(df: pd.DataFrame, class_column: str, max_nan_percentage: float = 0.9, random_state: int = 42):
         # ##########################################################################
         # #  Extracting Meta Features with pymfe  ##################################
         # ##########################################################################
@@ -368,10 +368,7 @@ class MetaFeatures(object):
                 'naive_bayes_sd': np.nan
             }
 
-        """
-        Selects Meta Features and extracts them
-        """
-
+        # Meta-Feature calculation does not work with missing data
         if np.any(pd.isna(X)):
             X_2 = X.copy()
             n = X_2.shape[0]
@@ -379,19 +376,26 @@ class MetaFeatures(object):
 
             for i in X_2.columns:
                 col = X_2[i]
-                if not pd.isna(col).any:
+                nan = pd.isna(col)
+                if not nan.any():
                     continue
+                elif nan.value_counts(normalize=True)[True] > max_nan_percentage:
+                    X_2.drop(i, axis=1, inplace=True)
                 elif i in numeric:
                     filler = np.random.normal(col.mean(), col.std(), n)
+                    X_2[i] = col.combine_first(pd.Series(filler))
                 else:
                     items = col.dropna().unique()
                     probability = col.value_counts(dropna=True, normalize=True)
                     probability = probability.where(probability > 0).dropna()
                     filler = np.random.choice(items, n, p=probability)
-                X_2[i] = col.combine_first(pd.Series(filler))
+                    X_2[i] = col.combine_first(pd.Series(filler))
         else:
             X_2 = X
 
+        """
+       Selects Meta Features and extracts them
+       """
         mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
                              'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
                              'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
