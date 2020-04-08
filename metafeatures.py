@@ -375,52 +375,23 @@ class MetaFeatures(object):
         if np.any(pd.isna(X)):
             X_2 = X.copy()
             n = X_2.shape[0]
-            X_object = X.select_dtypes(include=['category', 'object'])
-            X_numeric = X.select_dtypes(include=['float64', 'float32'])
 
-            for i in range(X_numeric.shape[1]):
+            for i in range(X_2.shape[1]):
                 col = X_2.iloc[:, i]
-                if pd.isna(col).any:
+                if not pd.isna(col).any:
+                    continue
+
+                if col.dtype in ['float64', 'float32']:
                     filler = np.random.normal(col.mean(), col.std(), n)
                     X_2.iloc[:, i] = col.combine_first(pd.Series(filler))
-            for i in range(X_object.shape[1]):
-                col = X_2.iloc[:, i]
-                if pd.isna(col).any:
+                elif col.dtype in ['category', 'object']:
                     items = col.dropna().unique()
-                    probability = col.value_counts(dropna=True) / len(col.dropna())
+                    probability = col.value_counts(dropna=True, normalize=True)
                     probability = probability.where(probability > 0).dropna()
                     filler = np.random.choice(items, n, p=probability)
                     X_2.iloc[:, i] = col.combine_first(pd.Series(filler))
-
-            # categorical = []
-            # numeric = []
-            # for i in range(X.shape[1]):
-            #     try:
-            #         X.iloc[:, i].values.astype(float)
-            #         numeric.append(i)
-            #     except ValueError:
-            #         categorical.append(i)
-            # for column in numeric:
-            #     mean = np.mean(X.iloc[:, column])
-            #     std = np.std(X.iloc[:, column])
-            #     nadf = X.iloc[:, column].isna()
-            #     for index, value in nadf.iteritems():
-            #         if value is True:
-            #             X.iloc[index, column] = np.random.normal(mean, std)
-            # for column in categorical:
-            #     items = X.iloc[:, column].tolist()
-            #     gesamt = len(X.iloc[:, column].dropna().tolist())
-            #     probability = []
-            #     nadf = X.iloc[:, column].isna()
-            #     for test in np.unique(items):
-            #         probability.append(items.count(test) / gesamt)
-            #     for index, value in nadf.iteritems():
-            #         if value is True:
-            #             X.iloc[index, column] = np.random.choice(np.unique(items), p=probability)
-
-
-
-
+                else:
+                    raise ValueError('Unknown dtype {}'.format(col.dtype))
         else:
             X_2 = X
 

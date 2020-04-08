@@ -68,6 +68,7 @@ class Core(object):
         self._abort = False
 
         LOGGER.info('Scanning cache dir. This may take some while...')
+        # TODO crashes if work_dir does not exist
         self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
         self.cache_percentage = cache_percentage
 

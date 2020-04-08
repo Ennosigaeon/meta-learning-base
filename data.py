@@ -16,6 +16,7 @@ LOGGER = logging.getLogger('mlb')
 
 
 def load_openml(dataset_conf: DatasetConfig) -> pd.DataFrame:
+    LOGGER.info("Loading openml dataset {}".format(dataset_conf.openml))
     ds = openml.datasets.get_dataset(dataset_conf.openml)
     X, y, categorical_indicator, attribute_names = ds.get_data(
         dataset_format='dataframe',

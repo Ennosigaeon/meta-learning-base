@@ -6,4 +6,4 @@ liste = [4, 40536, 40499, 40496, 23381, 23380, 6332, 4538, 4534, 4134, 1510, 151
          20, 12, 11, 41146, 41166, 41143, 41027, 40984, 40981, 40975, 1111, 41142, 3, 5, 2, 41159, 40994, 40983, 40982,
          40979, 40966, 40701, 40670, 40685, 1164]
 for it in liste:
-    os.system('python3 cli.py enter_data --openml ' + str(it) + ' --work-dir /vagrant/data/ --sql-config assets/sql.yaml --s3-config assets/s3.yaml')
+    os.system('python3.6 cli.py enter_data --openml ' + str(it) + ' --work-dir data/')
