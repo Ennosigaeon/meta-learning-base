@@ -381,17 +381,17 @@ class MetaFeatures(object):
                 if not pd.isna(col).any:
                     continue
 
-                if col.dtype in ['float64', 'float32']:
+                if col.dtype.name in ['float64', 'float32']:
                     filler = np.random.normal(col.mean(), col.std(), n)
                     X_2.iloc[:, i] = col.combine_first(pd.Series(filler))
-                elif col.dtype in ['category', 'object']:
+                elif col.dtype.name in ['category', 'object']:
                     items = col.dropna().unique()
                     probability = col.value_counts(dropna=True, normalize=True)
                     probability = probability.where(probability > 0).dropna()
                     filler = np.random.choice(items, n, p=probability)
                     X_2.iloc[:, i] = col.combine_first(pd.Series(filler))
                 else:
-                    raise ValueError('Unknown dtype {}'.format(col.dtype))
+                    raise ValueError('Unknown dtype {}'.format(col.dtype.name))
         else:
             X_2 = X
 
