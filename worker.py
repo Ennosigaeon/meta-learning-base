@@ -272,6 +272,7 @@ class Worker(object):
             elif wrapper.exit_status == 0 and res is not None:
                 LOGGER.debug('Saving algorithm...')
                 self.save_algorithm(algorithm.id, res)
+                return True
             else:
                 raise ValueError('Something went wrong transforming data set {}; {}'.format(res, wrapper.exit_status))
 
@@ -294,3 +295,6 @@ class Worker(object):
             LOGGER.error('Unexpected error testing algorithm: dataset={}\n{}'.format(self.dataset, msg))
             self.db.mark_algorithm_errored(algorithm.id, error_message=msg)
             return False
+
+        # Catch all fallback
+        return True
