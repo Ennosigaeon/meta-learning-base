@@ -221,7 +221,7 @@ class Worker(object):
             LOGGER.info('Dataset {} has been marked as complete.'.format(self.dataset))
 
             delete_data(self.dataset.train_path)
-            return
+            return True
 
         """
         Choose a random algorithm to work on the dataset
