@@ -267,13 +267,13 @@ class Core(object):
                         pbar.update(ds.processed - pbar.last_print_n)
 
                     # Safety valve to abort execution if something is broken
-                    if success:
-                        failure_counter = 0
-                    else:
+                    if success is False:
                         failure_counter += 1
                         if failure_counter > 10:
                             LOGGER.fatal('Received 10 consecutive unexpected exceptions. Aborting evaluation.')
                             sys.exit(1)
+                    else:
+                        failure_counter = 0
 
                 pbar.close()
             except AlgorithmError:
