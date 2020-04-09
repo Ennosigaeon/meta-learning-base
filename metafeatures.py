@@ -311,7 +311,39 @@ class MetaFeatures(object):
         """
         X, y = df.drop(class_column, axis=1), df[class_column]
 
-        if X.shape[0] == 0 or X.shape[1] == 0:
+        # Meta-Feature calculation does not work with missing data
+        X_2 = X.copy()
+        numeric = X_2.select_dtypes(include=['number']).columns
+        if np.any(pd.isna(X)):
+            n = X_2.shape[0]
+
+            for i in X_2.columns:
+                col = X_2[i]
+                nan = pd.isna(col)
+                if not nan.any():
+                    continue
+                elif nan.value_counts(normalize=True)[True] > max_nan_percentage:
+                    X_2.drop(i, axis=1, inplace=True)
+                elif i in numeric:
+                    filler = np.random.normal(col.mean(), col.std(), n)
+                    X_2[i] = col.combine_first(pd.Series(filler))
+                else:
+                    items = col.dropna().unique()
+                    probability = col.value_counts(dropna=True, normalize=True)
+                    probability = probability.where(probability > 0).dropna()
+                    filler = np.random.choice(items, n, p=probability)
+                    X_2[i] = col.combine_first(pd.Series(filler))
+
+        for i in X_2.columns:
+            col = X_2[i]
+            if i in numeric:
+                if not (abs(col - col.iloc[0]) > 1e-10).any():
+                    X_2.drop(i, inplace=True, axis=1)
+            else:
+                if not (col != col.iloc[0]).any():
+                    X_2.drop(i, inplace=True, axis=1)
+
+        if X_2.shape[0] == 0 or X_2.shape[1] == 0:
             LOGGER.info('X has no samples or features. Setting meta-features to default.')
             return {
                 'nr_inst': 0,
@@ -368,31 +400,6 @@ class MetaFeatures(object):
                 'naive_bayes_sd': np.nan
             }
 
-        # Meta-Feature calculation does not work with missing data
-        if np.any(pd.isna(X)):
-            X_2 = X.copy()
-            n = X_2.shape[0]
-            numeric = X_2.select_dtypes(include=['number']).columns
-
-            for i in X_2.columns:
-                col = X_2[i]
-                nan = pd.isna(col)
-                if not nan.any():
-                    continue
-                elif nan.value_counts(normalize=True)[True] > max_nan_percentage:
-                    X_2.drop(i, axis=1, inplace=True)
-                elif i in numeric:
-                    filler = np.random.normal(col.mean(), col.std(), n)
-                    X_2[i] = col.combine_first(pd.Series(filler))
-                else:
-                    items = col.dropna().unique()
-                    probability = col.value_counts(dropna=True, normalize=True)
-                    probability = probability.where(probability > 0).dropna()
-                    filler = np.random.choice(items, n, p=probability)
-                    X_2[i] = col.combine_first(pd.Series(filler))
-        else:
-            X_2 = X
-
         """
        Selects Meta Features and extracts them
        """
@@ -424,140 +431,59 @@ class MetaFeatures(object):
         leaves = float(f_value[f_name.index('leaves')])
         nodes_per_attr = float(f_value[f_name.index('nodes_per_attr')])
 
-        try:
-            skewness_mean = float(f_value[f_name.index('skewness.mean')])
-        except:
-            skewness_mean = float(f_value[f_name.index('skewness')])
-        try:
-            skewness_sd = float(f_value[f_name.index('skewness.sd')])
-        except:
-            skewness_sd = float(f_value[f_name.index('skewness')])
+        def get_value(key: str):
+            try:
+                return float(f_value[f_name.index(key)])
+            except:
+                return float(f_value[f_name.index(key.split('.')[0])])
 
-        try:
-            kurtosis_mean = float(f_value[f_name.index('kurtosis.mean')])
-        except:
-            kurtosis_mean = float(f_value[f_name.index('kurtosis')])
-        try:
-            kurtosis_sd = float(f_value[f_name.index('kurtosis.sd')])
-        except:
-            kurtosis_sd = float(f_value[f_name.index('kurtosis')])
+        skewness_mean = get_value('skewness.mean')
+        skewness_sd = get_value('skewness.sd') if nr_attr > 1 else 0
 
-        try:
-            cor_mean = float(f_value[f_name.index('cor.mean')])
-        except:
-            cor_mean = float(f_value[f_name.index('cor')])
-        try:
-            cor_sd = float(f_value[f_name.index('cor.sd')])
-        except:
-            cor_sd = float(f_value[f_name.index('cor')])
+        kurtosis_mean = get_value('kurtosis.mean')
+        kurtosis_sd = get_value('kurtosis.sd') if nr_attr > 1 else 0
 
-        try:
-            cov_mean = float(f_value[f_name.index('cov.mean')])
-        except:
-            cov_mean = float(f_value[f_name.index('cov')])
-        try:
-            cov_sd = float(f_value[f_name.index('cov.sd')])
-        except:
-            cov_sd = float(f_value[f_name.index('cov')])
+        cor_mean = get_value('cor.mean') if nr_attr > 1 else 1
+        cor_sd = get_value('cor.sd') if nr_attr > 2 else 0
 
-        try:
-            sparsity_mean = float(f_value[f_name.index('sparsity.mean')])
-        except:
-            sparsity_mean = float(f_value[f_name.index('sparsity')])
-        try:
-            sparsity_sd = float(f_value[f_name.index('sparsity.sd')])
-        except:
-            sparsity_sd = float(f_value[f_name.index('sparsity')])
+        cov_mean = get_value('cov.mean') if nr_attr > 1 else 0
+        cov_sd = get_value('cov.sd') if nr_attr > 2 else 0
 
-        try:
-            var_mean = float(f_value[f_name.index('var.mean')])
-        except:
-            var_mean = float(f_value[f_name.index('var')])
-        try:
-            var_sd = float(f_value[f_name.index('var.sd')])
-        except:
-            var_sd = float(f_value[f_name.index('var')])
+        sparsity_mean = get_value('sparsity.mean')
+        sparsity_sd = get_value('sparsity.sd') if nr_attr > 1 else 0
 
-        try:
-            attr_ent_mean = float(f_value[f_name.index('attr_ent.mean')])
-        except:
-            attr_ent_mean = float(f_value[f_name.index('attr_ent')])
-        try:
-            attr_ent_sd = float(f_value[f_name.index('attr_ent.sd')])
-        except:
-            attr_ent_sd = float(f_value[f_name.index('attr_ent')])
+        var_mean = get_value('var.mean')
+        var_sd = get_value('var.sd') if nr_attr > 1 else 0
 
-        try:
-            mut_inf_mean = float(f_value[f_name.index('mut_inf.mean')])
-        except:
-            mut_inf_mean = float(f_value[f_name.index('mut_inf')])
-        try:
-            mut_inf_sd = float(f_value[f_name.index('mut_inf.sd')])
-        except:
-            mut_inf_sd = float(f_value[f_name.index('mut_inf')])
+        attr_ent_mean = get_value('attr_ent.mean')
+        attr_ent_sd = get_value('attr_ent.sd') if nr_attr > 1 else 0
 
-        try:
-            leaves_branch_mean = float(f_value[f_name.index('leaves_branch.mean')])
-        except:
-            leaves_branch_mean = float(f_value[f_name.index('leaves_branch')])
-        try:
-            leaves_branch_sd = float(f_value[f_name.index('leaves_branch.sd')])
-        except:
-            leaves_branch_sd = float(f_value[f_name.index('leaves_branch')])
+        mut_inf_mean = get_value('mut_inf.mean')
+        mut_inf_sd = get_value('mut_inf.sd') if nr_attr > 1 else 0
 
-        try:
-            leaves_per_class_mean = float(f_value[f_name.index('leaves_per_class.mean')])
-        except:
-            leaves_per_class_mean = float(f_value[f_name.index('leaves_per_class')])
-        try:
-            leaves_per_class_sd = float(f_value[f_name.index('leaves_per_class.sd')])
-        except:
-            leaves_per_class_sd = float(f_value[f_name.index('leaves_per_class')])
+        leaves_branch_mean = get_value('leaves_branch.mean')
+        leaves_branch_sd = get_value('leaves_branch.sd')
 
-        try:
-            var_importance_mean = float(f_value[f_name.index('var_importance.mean')])
-        except:
-            var_importance_mean = float(f_value[f_name.index('var_importance')])
-        try:
-            var_importance_sd = float(f_value[f_name.index('var_importance.sd')])
-        except:
-            var_importance_sd = float(f_value[f_name.index('var_importance')])
+        leaves_per_class_mean = get_value('leaves_per_class.mean')
+        leaves_per_class_sd = get_value('leaves_per_class.sd')
+        # not sure under which conditions this exactly happens.
+        if np.isnan(leaves_per_class_sd):
+            leaves_per_class_sd = 0
 
-        try:
-            one_nn_mean = float(f_value[f_name.index('one_nn.mean')])
-        except:
-            one_nn_mean = float(f_value[f_name.index('one_nn')])
-        try:
-            one_nn_sd = float(f_value[f_name.index('one_nn.sd')])
-        except:
-            one_nn_sd = float(f_value[f_name.index('one_nn')])
+        var_importance_mean = get_value('var_importance.mean')
+        var_importance_sd = get_value('var_importance.sd') if nr_attr > 1 else 0
 
-        try:
-            best_node_mean = float(f_value[f_name.index('best_node.mean')])
-        except:
-            best_node_mean = float(f_value[f_name.index('best_node')])
-        try:
-            best_node_sd = float(f_value[f_name.index('best_node.sd')])
-        except:
-            best_node_sd = float(f_value[f_name.index('best_node')])
+        one_nn_mean = get_value('one_nn.mean')
+        one_nn_sd = get_value('one_nn.sd')
 
-        try:
-            linear_discr_mean = float(f_value[f_name.index('linear_discr.mean')])
-        except:
-            linear_discr_mean = float(f_value[f_name.index('linear_discr')])
-        try:
-            linear_discr_sd = float(f_value[f_name.index('linear_discr.sd')])
-        except:
-            linear_discr_sd = float(f_value[f_name.index('linear_discr')])
+        best_node_mean = get_value('best_node.mean')
+        best_node_sd = get_value('best_node.sd')
 
-        try:
-            naive_bayes_mean = float(f_value[f_name.index('naive_bayes.mean')])
-        except:
-            naive_bayes_mean = float(f_value[f_name.index('naive_bayes')])
-        try:
-            naive_bayes_sd = float(f_value[f_name.index('naive_bayes.sd')])
-        except:
-            naive_bayes_sd = float(f_value[f_name.index('naive_bayes')])
+        linear_discr_mean = get_value('linear_discr.mean')
+        linear_discr_sd = get_value('linear_discr.sd')
+
+        naive_bayes_mean = get_value('naive_bayes.mean')
+        naive_bayes_sd = get_value('naive_bayes.sd')
 
         # ##########################################################################
         # #  Extracting Meta Features with AutoSklearn  ############################
