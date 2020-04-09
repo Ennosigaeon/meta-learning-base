@@ -11,10 +11,10 @@ Download other projects and install them
 cd ..
 git clone https://gitlab.usu-research.ml/research/automl/sklearn-components.git
 pip3 install -r sklearn-components/requirements.txt
-pip install -e sklearn-components
+pip3 install -e sklearn-components
 
 git clone https://github.com/Ennosigaeon/pynisher.git
-pip install -e pynisher
+pip3 install -e pynisher
 ```
 
 Install system-packages
