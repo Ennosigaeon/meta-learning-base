@@ -202,7 +202,7 @@ class Worker(object):
 
         return False
 
-    def run_algorithm(self):
+    def run_algorithm(self) -> bool:
         """
         First run_algorithm checks if is_dataset_finished returns True or False. If it returns True, the dataset is
         marked as complete. If is_dataset_finished returns False, run_algorithm creates a new Algorithm instance with
@@ -280,13 +280,17 @@ class Worker(object):
         except TimeoutError as ex:
             LOGGER.info('Algorithm violated time constraints: '.format(str(ex)))
             self.db.mark_algorithm_errored(algorithm.id, error_message='Timeout: '.format(str(ex)))
+            return True
         except MemoryError as ex:
             LOGGER.info('Algorithm violated memory constraints: '.format(str(ex)))
             self.db.mark_algorithm_errored(algorithm.id, error_message='MemoryLimit: '.format(str(ex)))
+            return True
         except AlgorithmError as ex:
             LOGGER.info('Algorithm raised exception: {}'.format(str(ex)))
             self.db.mark_algorithm_errored(algorithm.id, error_message=ex.details)
+            return True
         except Exception:
             msg = traceback.format_exc()
             LOGGER.error('Unexpected error testing algorithm: dataset={}\n{}'.format(self.dataset, msg))
             self.db.mark_algorithm_errored(algorithm.id, error_message=msg)
+            return False

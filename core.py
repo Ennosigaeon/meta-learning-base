@@ -208,6 +208,8 @@ class Core(object):
         # #  Main Loop  ############################################################
         # ##########################################################################
 
+        failure_counter = 0
+
         while True:
             if self._abort:
                 LOGGER.info("Stopping processing due to user request")
@@ -259,10 +261,19 @@ class Core(object):
 
                 """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""
                 while ds.status == RunStatus.RUNNING:
-                    worker.run_algorithm()
+                    success = worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)
                     if verbose and ds.processed > pbar.last_print_n:
                         pbar.update(ds.processed - pbar.last_print_n)
+
+                    # Safety valve to abort execution if something is broken
+                    if success:
+                        failure_counter = 0
+                    else:
+                        failure_counter += 1
+                        if failure_counter > 10:
+                            LOGGER.fatal('Received 10 consecutive unexpected exceptions. Aborting evaluation.')
+                            sys.exit(1)
 
                 pbar.close()
             except AlgorithmError:
