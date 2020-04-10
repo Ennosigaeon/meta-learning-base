@@ -1,5 +1,6 @@
 ConfigSpace==0.4.*
 PyYAML==5.3.*
+Pympler==0.8
 google-cloud-storage==1.26.0
 numpy==1.16.*
 openml==0.10.*

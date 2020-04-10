@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import sys
+from io import StringIO
 from operator import attrgetter
 
 import math
@@ -15,6 +16,7 @@ import shutil
 import signal
 import time
 import uuid
+from pympler import muppy, summary, refbrowser
 from tqdm import tqdm
 from typing import List
 
@@ -131,7 +133,8 @@ class Core(object):
 
                 for key, value in mf.items():
                     if math.isinf(value):
-                        LOGGER.info('Value of Meta Feature "{}" is infinite and is replaced by constant value'.format(key))
+                        LOGGER.info(
+                            'Value of Meta Feature "{}" is infinite and is replaced by constant value'.format(key))
                         if value > 0:
                             mf[key] = sys.maxsize
                         else:
@@ -269,6 +272,18 @@ class Core(object):
                         failure_counter += 1
                         if failure_counter > 10:
                             LOGGER.fatal('Received 10 consecutive unexpected exceptions. Aborting evaluation.')
+
+                            # We occasionally encounter OSError: [Errno 12] Cannot allocate memory. To debug the memory
+                            # leak the current heap allocation is logged
+                            all_objects = muppy.get_objects()
+                            LOGGER.fatal('Heap Dump:\n' + '\n'.join(summary.format_(summary.summarize(all_objects))))
+
+                            buffer = StringIO()
+                            cb = refbrowser.StreamBrowser(self, maxdepth=4, str_func=lambda o: str(type(o)),
+                                                          stream=buffer)
+                            cb.print_tree()
+                            LOGGER.fatal('References:\n' + buffer.getvalue())
+
                             sys.exit(1)
                     else:
                         failure_counter = 0
