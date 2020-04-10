@@ -8,6 +8,8 @@ import scipy.sparse
 import time
 from pymfe.mfe import MFE
 
+from constants import RunStatus
+
 LOGGER = logging.getLogger('mlb')
 
 
@@ -343,8 +345,10 @@ class MetaFeatures(object):
                     X.drop(i, inplace=True, axis=1)
 
         if X.shape[0] == 0 or X.shape[1] == 0:
-            LOGGER.info('X has no samples or features. Setting meta-features to default.')
+            LOGGER.info('X has no samples, no features or only constant values. Marking dataset as skipped.')
             return {
+                'status': RunStatus.SKIPPED,
+
                 'nr_inst': 0,
                 'nr_attr': 0,
                 'nr_class': 0,
