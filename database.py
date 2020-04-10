@@ -165,7 +165,7 @@ class Dataset(Base):
                  one_nn_sd=None, best_node_mean=None, best_node_sd=None,
                  linear_discr_mean=None, linear_discr_sd=None, naive_bayes_mean=None, naive_bayes_sd=None,
                  nr_missing_values=None, pct_missing_values=None, nr_inst_mv=None, nr_attr_mv=None, pct_inst_mv=None,
-                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None,):
+                 pct_attr_mv=None, class_prob_mean=None, class_prob_std=None, class_column=None):
         self.train_path = train_path
         self.name = name or self._make_name(train_path)
         self.status = status
@@ -277,14 +277,14 @@ class Algorithm(Base):
     """
     host = Column(String)
 
-    """Decode hyperparameters from base64 to object"""
     @property
     def hyperparameter_values(self) -> dict:
+        """Decode hyperparameters from base64 to object"""
         return base_64_to_object(self.hyperparameter_values_64)
 
-    """Encode hyperparameters from object to base64"""
     @hyperparameter_values.setter
     def hyperparameter_values(self, value: Configuration):
+        """Encode hyperparameters from object to base64"""
         if value is None:
             d = {}
         else:
@@ -408,37 +408,24 @@ class Database(object):
         return self.session.query(Dataset).get(dataset_id)
 
     @try_with_session()
-    def get_datasets(self, ignore_pending: bool = False, ignore_running: bool = False,
-                     ignore_complete: bool = True, ignore_skipped: bool = True) -> Optional[List[Dataset]]:
-
+    def get_datasets(self) -> Optional[List[Dataset]]:
         """
-        Get a list of all datasets matching the chosen filters.
-
-        Args:
-            ignore_pending: if True, ignore datasets that have not been started
-            ignore_running: if True, ignore datasets that are already running
-            ignore_complete: if True, ignore completed datasets
-            ignore_skipped: if True, ignore skipped datasets
+        Get a list of datasets that can be worked on.
         """
 
-        query = self.session.query(Dataset)
-        if ignore_pending:
-            query = query.filter(Dataset.status != RunStatus.PENDING)
-        if ignore_running:
-            query = query.filter(Dataset.status != RunStatus.RUNNING)
-        if ignore_complete:
-            query = query.filter(Dataset.status != RunStatus.COMPLETE)
-        if ignore_skipped:
-            query = query.filter(Dataset.status != RunStatus.SKIPPED)
+        # Load running datasets first
+        datasets = self.session.query(Dataset).filter(Dataset.status == RunStatus.RUNNING).limit(100).all()
 
-        datasets = query.all()
+        # Fallback to pending datasets
+        if len(datasets) == 0:
+            datasets = self.session.query(Dataset).filter(Dataset.status == RunStatus.PENDING).limit(100).all()
 
         if len(datasets) == 0:
             return None
         return datasets
 
     @try_with_session()
-    def get_dataset_by_hash(self, hashcode: str) -> List[Dataset]:
+    def get_datasets_by_hash(self, hashcode: str) -> List[Dataset]:
         """ Get a specific dataset. """
         return self.session.query(Dataset).filter(Dataset.hashcode == hashcode).all()
 
@@ -448,34 +435,15 @@ class Database(object):
         return self.session.query(Algorithm).get(algorithm_id)
 
     @try_with_session()
-    def get_algorithms(self, dataset_id: int = None, ignore_errored: bool = False, ignore_running: bool = False,
-                       ignore_complete: bool = True) -> Optional[List[Algorithm]]:
-
+    def get_algorithm_count(self, dataset_id: int) -> int:
         """
-        Get a list of all algorithms matching the chosen filters.
+        Get a list of all algorithms matching the give dataset.
 
         Args:
             dataset_id: id of the corresponding dataset
-            ignore_errored: if True, ignore algorithms that are errored
-            ignore_running: if True, ignore algorithms that are already running
-            ignore_complete: if True, ignore completed algorithms
         """
-
-        query = self.session.query(Algorithm)
-        if dataset_id is not None:
-            query = query.filter(Algorithm.dataset_id == dataset_id)
-        if ignore_errored:
-            query = query.filter(Algorithm.status != AlgorithmStatus.ERRORED)
-        if ignore_running:
-            query = query.filter(Algorithm.status != AlgorithmStatus.RUNNING)
-        if ignore_complete:
-            query = query.filter(Algorithm.status != AlgorithmStatus.COMPLETE)
-
-        algorithms = query.all()
-
-        if not len(algorithms):
-            return None
-        return algorithms
+        n = self.session.query(Algorithm).filter(Algorithm.dataset_id == dataset_id).count()
+        return n
 
     # ##########################################################################
     # #  Methods to update the database  #######################################

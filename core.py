@@ -103,12 +103,13 @@ class Core(object):
 
         """Check if new dataset equals existing dataset. If False store transformed dataset to DB"""
         hashcode = hash_file(local_file)
-        similar_datasets: List[Dataset] = self.db.get_dataset_by_hash(hashcode)
+        similar_datasets: List[Dataset] = self.db.get_datasets_by_hash(hashcode)
         for ds in similar_datasets:
             df_old = ds.load(self.s3_config, self.s3_bucket)
             if df.equals(df_old):
                 LOGGER.info('New dataset equals dataset {} and is not stored in the DB.'.format(ds.id))
                 return ds
+            del df_old
 
         """Uploads input dataset to cloud"""
         upload_data(local_file, self.s3_config, self.s3_bucket, name)
@@ -202,7 +203,7 @@ class Core(object):
             verbose (bool):
                 Whether to be verbose about the process. Optional. Defaults to ``True``.
         """
-        signal.signal(signal.SIGUSR1, lambda signal, frame: self._user_abort())
+        signal.signal(signal.SIGUSR1, lambda s, frame: self._user_abort())
 
         # ##########################################################################
         # #  Main Loop  ############################################################
@@ -224,22 +225,17 @@ class Core(object):
                     LOGGER.debug('No datasets found. Sleeping %d seconds and trying again.', self._LOOP_WAIT)
                     time.sleep(self._LOOP_WAIT)
                     continue
-
                 else:
                     LOGGER.info('No datasets found. Exiting.')
                     break
 
-            """Take all RUNNING datasets as first priority, then take PENDING"""
-            candidates = [d for d in datasets if d.status == RunStatus.RUNNING]
-            if len(candidates) == 0:
-                candidates = datasets
-
             """Either choose a dataset randomly between priority, or take the dataset with the lowest ID"""
             if choose_randomly:
-                ds = random.choice(candidates)
+                ds = random.choice(datasets)
             else:
-                ds = sorted(candidates, key=attrgetter('id'))[0]
+                ds = sorted(datasets, key=attrgetter('id'))[0]
             LOGGER.info('Computing on dataset {}'.format(ds.id))
+            worker = None
 
             """
             Mark dataset as RUNNING
@@ -268,6 +264,8 @@ class Core(object):
 
                     # Safety valve to abort execution if something is broken
                     if success is False:
+                        LOGGER.error('Something went wrong. Sleeping {} seconds.'.format(self._LOOP_WAIT))
+                        time.sleep(self._LOOP_WAIT)
                         failure_counter += 1
                         if failure_counter > 10:
                             LOGGER.fatal('Received 10 consecutive unexpected exceptions. Aborting evaluation.')
@@ -282,3 +280,6 @@ class Core(object):
                 """
                 LOGGER.error('Something went wrong. Sleeping {} seconds.'.format(self._LOOP_WAIT))
                 time.sleep(self._LOOP_WAIT)
+            finally:
+                del datasets
+                del worker

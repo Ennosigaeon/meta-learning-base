@@ -312,38 +312,37 @@ class MetaFeatures(object):
         X, y = df.drop(class_column, axis=1), df[class_column]
 
         # Meta-Feature calculation does not work with missing data
-        X_2 = X.copy()
-        numeric = X_2.select_dtypes(include=['number']).columns
+        numeric = X.select_dtypes(include=['number']).columns
         if np.any(pd.isna(X)):
-            n = X_2.shape[0]
+            n = X.shape[0]
 
-            for i in X_2.columns:
-                col = X_2[i]
+            for i in X.columns:
+                col = X[i]
                 nan = pd.isna(col)
                 if not nan.any():
                     continue
                 elif nan.value_counts(normalize=True)[True] > max_nan_percentage:
-                    X_2.drop(i, axis=1, inplace=True)
+                    X.drop(i, axis=1, inplace=True)
                 elif i in numeric:
                     filler = np.random.normal(col.mean(), col.std(), n)
-                    X_2[i] = col.combine_first(pd.Series(filler))
+                    X[i] = col.combine_first(pd.Series(filler))
                 else:
                     items = col.dropna().unique()
                     probability = col.value_counts(dropna=True, normalize=True)
                     probability = probability.where(probability > 0).dropna()
                     filler = np.random.choice(items, n, p=probability)
-                    X_2[i] = col.combine_first(pd.Series(filler))
+                    X[i] = col.combine_first(pd.Series(filler))
 
-        for i in X_2.columns:
-            col = X_2[i]
+        for i in X.columns:
+            col = X[i]
             if i in numeric:
                 if not (abs(col - col.iloc[0]) > 1e-10).any():
-                    X_2.drop(i, inplace=True, axis=1)
+                    X.drop(i, inplace=True, axis=1)
             else:
                 if not (col != col.iloc[0]).any():
-                    X_2.drop(i, inplace=True, axis=1)
+                    X.drop(i, inplace=True, axis=1)
 
-        if X_2.shape[0] == 0 or X_2.shape[1] == 0:
+        if X.shape[0] == 0 or X.shape[1] == 0:
             LOGGER.info('X has no samples or features. Setting meta-features to default.')
             return {
                 'nr_inst': 0,
@@ -408,7 +407,7 @@ class MetaFeatures(object):
                              'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
                              'var_importance', 'one_nn', 'best_node', 'linear_discr',
                              'naive_bayes', 'leaves_per_class']))
-        mfe.fit(X_2.to_numpy(), y.to_numpy(), transform_cat=True)
+        mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
         f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
         # Extracting Meta Features with AutoSklearn

@@ -183,19 +183,14 @@ class Worker(object):
         Last is_dataset_finished checks if a dataset has reached max pipeline depth. If a dataset has reached
         max pipeline depth, is_dataset_finished returns True.
         """
-        algorithms = self.db.get_algorithms(dataset_id=self.dataset.id, ignore_complete=False)
+        n_completed = self.db.get_algorithm_count(dataset_id=self.dataset.id)
 
         # Dataset has reached max pipeline depth
         if self.dataset.depth >= self.max_pipeline_depth:
             LOGGER.info('Dataset {} has reached max pipeline depth!'.format(self.dataset))
             return True
 
-        # No algorithms for this data set started yet
-        if not algorithms:
-            return False
-
         # No budget for dataset
-        n_completed = len(algorithms)
         if n_completed >= self.dataset.budget:
             LOGGER.info('Algorithm budget for dataset {} has run out!'.format(self.dataset))
             return True
