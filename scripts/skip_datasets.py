@@ -23,31 +23,34 @@ with engine.connect() as conn:
         store = True
         print(id)
 
-        # df = load_data('data/' + name + '.parquet')
-        local_file = '../data/' + name + '.parquet'
-        df = load_data(local_file, s3_config='../assets/limbo-233520-a283e9f868c1.json',
-                       s3_bucket='usu-mlb', name=name)
+        try:
+            # df = load_data('data/' + name + '.parquet')
+            local_file = '../data/' + name + '.parquet'
+            df = load_data(local_file, s3_config='../assets/limbo-233520-a283e9f868c1.json',
+                           s3_bucket='usu-mlb', name=name)
 
-        X, y = df.drop(class_column, axis=1), df[class_column]
-        numeric = X.select_dtypes(include=['number']).columns
+            X, y = df.drop(class_column, axis=1), df[class_column]
+            numeric = X.select_dtypes(include=['number']).columns
 
-        for i in X.columns:
-            col = X[i]
-            if i in numeric:
-                if not (abs(col - col.iloc[0]) > 1e-10).any():
-                    X.drop(i, inplace=True, axis=1)
-            else:
-                if not (col != col.iloc[0]).any():
-                    X.drop(i, inplace=True, axis=1)
+            for i in X.columns:
+                col = X[i]
+                if i in numeric:
+                    if not (abs(col - col.iloc[0]) > 1e-10).any():
+                        X.drop(i, inplace=True, axis=1)
+                else:
+                    if not (col != col.iloc[0]).any():
+                        X.drop(i, inplace=True, axis=1)
 
-        if (X.shape[0] == 0 or X.shape[1] == 0) and df.var().max() == 0:
-            update_statement = '''
-                UPDATE datasets SET 
-                status = 'skipped'
-                WHERE id = {};
-            '''.format(id)
+            if (X.shape[0] == 0 or X.shape[1] == 0) and df.var().max() == 0:
+                update_statement = '''
+                    UPDATE datasets SET 
+                    status = 'skipped'
+                    WHERE id = {};
+                '''.format(id)
 
-            print('Updating')
-            conn.execute(update_statement)
+                print('Updating')
+                conn.execute(update_statement)
 
-        os.remove(local_file)
+            os.remove(local_file)
+        except OSError as ex:
+            print(ex)
