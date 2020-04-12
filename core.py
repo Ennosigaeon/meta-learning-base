@@ -74,8 +74,7 @@ class Core(object):
         self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
         self.cache_percentage = cache_percentage
 
-    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, budget: int = None, name: str = None,
-                    max_features: int = 10000):
+    def add_dataset(self, df: pd.DataFrame, class_column: str, depth: int, budget: int = None, name: str = None):
         """Add a new dataset to the Database.
         Args:
             df (DataFrame):
@@ -92,7 +91,6 @@ class Core(object):
                 The max pipeline depth a dataset can reach.
 
             budget (int):
-            max_features:
         """
 
         """Generate name using a random uuid, if input dataset has no name"""
@@ -118,36 +116,26 @@ class Core(object):
 
         """Calculates metafeatures for input dataset"""
         try:
-            """Checks if number of features is bigger than max_features. Creates dataset with status skipped"""
-            if df.shape[1] > max_features:
-                LOGGER.info('Number of features is bigger then {}. Creating dataset with status skipped...'
-                            .format(max_features))
-                mf = {
-                    'nr_inst': df.shape[0],
-                    'nr_attr': df.shape[1],
-                    'status': RunStatus.SKIPPED
-                }
-            else:
-                LOGGER.info('Extracting meta-features...')
-                mf = self.metafeatures.calculate(df=df, class_column=class_column)
+            LOGGER.info('Extracting meta-features...')
+            mf, success = self.metafeatures.calculate(df=df, class_column=class_column)
 
-                for key, value in mf.items():
-                    if math.isinf(value):
-                        LOGGER.info(
-                            'Value of Meta Feature "{}" is infinite and is replaced by constant value'.format(key))
-                        if value > 0:
-                            mf[key] = sys.maxsize
-                        else:
-                            mf[key] = -sys.maxsize
-
-        except MemoryError as ex:
-            LOGGER.exception('Meta-Feature calculation ran out of memory. Fallback to empty meta-features', ex)
-            mf = {}
+            for key, value in mf.items():
+                if math.isinf(value):
+                    LOGGER.info(
+                        'Value of Meta Feature "{}" is infinite and is replaced by constant value'.format(key))
+                    if value > 0:
+                        mf[key] = sys.maxsize
+                    else:
+                        mf[key] = -sys.maxsize
         except ValueError as ex:
             LOGGER.exception('Failed to compute meta-features. Fallback to empty meta-features', ex)
-            mf = {}
+            mf, success = {}, False
 
-        """Saves input dataset and calculated metafeatures to db"""
+        if not success:
+            LOGGER.info('Meta-feature extraction failed. Marking this dataset as \'skipped\'')
+            mf['status'] = RunStatus.SKIPPED
+
+        """Saves input dataset and calculated meta-features to db"""
         if budget is None:
             budget = self.dataset_budget
 

@@ -4,11 +4,11 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+import pynisher2
 import scipy.sparse
 import time
 from pymfe.mfe import MFE
-
-from constants import RunStatus
+from typing import Dict, Tuple
 
 LOGGER = logging.getLogger('mlb')
 
@@ -302,16 +302,73 @@ class ClassProbabilitySTD(MetaFeature):
 
 class MetaFeatures(object):
 
-    @staticmethod
-    def calculate(df: pd.DataFrame, class_column: str, max_nan_percentage: float = 0.9, random_state: int = 42):
-        # ##########################################################################
-        # #  Extracting Meta Features with pymfe  ##################################
-        # ##########################################################################
+    def __init__(self, mf_timeout: int = 600, mf_memory: int = 6144):
+        self.mf_timeout = mf_timeout
+        self.mf_memory = mf_memory
+        self.subprocess_logger = logging.getLogger('mlb:mf')
 
+    def calculate(self,
+                  df: pd.DataFrame,
+                  class_column: str,
+                  max_nan_percentage: float = 0.9,
+                  max_features: int = 10000,
+                  random_state: int = 42) -> Tuple[Dict[str, float], bool]:
         """
-        Loads dataframe and splits it in X, y
+        Calculates the meta-features for the given DataFrame. The actual computation is dispatched to another process
+        to prevent crashes due to extensive memory usage.
+        :param df:
+        :param class_column:
+        :param max_nan_percentage:
+        :param max_features:
+        :param random_state:
+        :return:
+        """
+
+        wrapper = pynisher2.enforce_limits(wall_time_in_s=self.mf_timeout, logger=self.subprocess_logger,
+                                           mem_in_mb=self.mf_memory)(self._calculate)
+        res = wrapper(df, class_column, max_nan_percentage=max_nan_percentage, max_features=max_features,
+                      random_state=random_state)
+        if wrapper.exit_status is pynisher2.TimeoutException or wrapper.exit_status is pynisher2.MemorylimitException:
+            LOGGER.info('MF calculation violated constraints')
+            return {
+                       'nr_inst': df.shape[0],
+                       'nr_attr': df.shape[1]
+                   }, False
+        elif wrapper.exit_status is pynisher2.AnythingException:
+            LOGGER.warning('Failed to extract MF due to {}'.format(res[0]))
+            return {
+                       'nr_inst': df.shape[0],
+                       'nr_attr': df.shape[1]
+                   }, False
+        elif wrapper.exit_status == 0 and res is not None:
+            return res
+
+    @staticmethod
+    def _calculate(df: pd.DataFrame,
+                   class_column: str,
+                   max_nan_percentage: float = 0.9,
+                   max_features: int = 10000,
+                   random_state: int = 42) -> Tuple[Dict[str, float], bool]:
+        """
+        Calculates the meta-features for the given DataFrame. _Attention_: Meta-feature calculation can require a lot of
+        memory. This method should not be called directly to prevent the caller from crashing.
+        :param df:
+        :param class_column:
+        :param max_nan_percentage:
+        :param max_features:
+        :param random_state:
+        :return:
         """
         X, y = df.drop(class_column, axis=1), df[class_column]
+
+        # Checks if number of features is bigger than max_features.
+        if X.shape[1] > max_features:
+            LOGGER.info(
+                'Number of features is bigger then {}. Creating dataset with status skipped...'.format(max_features))
+            return {
+                       'nr_inst': df.shape[0],
+                       'nr_attr': df.shape[1],
+                   }, False
 
         # Meta-Feature calculation does not work with missing data
         numeric = X.select_dtypes(include=['number']).columns
@@ -347,61 +404,9 @@ class MetaFeatures(object):
         if X.shape[0] == 0 or X.shape[1] == 0:
             LOGGER.info('X has no samples, no features or only constant values. Marking dataset as skipped.')
             return {
-                'status': RunStatus.SKIPPED,
-
-                'nr_inst': 0,
-                'nr_attr': 0,
-                'nr_class': 0,
-                'nr_missing_values': np.nan,
-                'pct_missing_values': np.nan,
-                'nr_inst_mv': np.nan,
-                'pct_inst_mv': np.nan,
-                'nr_attr_mv': np.nan,
-                'pct_attr_mv': np.nan,
-                'nr_outliers': 0,
-
-                'skewness_mean': np.nan,
-                'skewness_sd': np.nan,
-                'kurtosis_mean': np.nan,
-                'kurtosis_sd': np.nan,
-                'cor_mean': np.nan,
-                'cor_sd': np.nan,
-                'cov_mean': np.nan,
-                'cov_sd': np.nan,
-                'sparsity_mean': np.nan,
-                'sparsity_sd': np.nan,
-                'var_mean': np.nan,
-                'var_sd': np.nan,
-
-                'class_prob_mean': np.nan,
-                'class_prob_std': np.nan,
-                'class_ent': np.nan,
-                'attr_ent_mean': np.nan,
-                'attr_ent_sd': np.nan,
-                'mut_inf_mean': np.nan,
-                'mut_inf_sd': np.nan,
-                'eq_num_attr': np.nan,
-                'ns_ratio': np.nan,
-
-                'nodes': np.nan,
-                'leaves': np.nan,
-                'leaves_branch_mean': np.nan,
-                'leaves_branch_sd': np.nan,
-                'nodes_per_attr': np.nan,
-                'leaves_per_class_mean': np.nan,
-                'leaves_per_class_sd': np.nan,
-                'var_importance_mean': np.nan,
-                'var_importance_sd': np.nan,
-
-                'one_nn_mean': np.nan,
-                'one_nn_sd': np.nan,
-                'best_node_mean': np.nan,
-                'best_node_sd': np.nan,
-                'linear_discr_mean': np.nan,
-                'linear_discr_sd': np.nan,
-                'naive_bayes_mean': np.nan,
-                'naive_bayes_sd': np.nan
-            }
+                       'nr_inst': X.shape[0],
+                       'nr_attr': X.shape[1],
+                   }, False
 
         """
        Selects Meta Features and extracts them
@@ -505,56 +510,56 @@ class MetaFeatures(object):
         # pca_skewness = PCASkewnessFirstPC())(X, y, categorical=True).value
 
         return {
-            'nr_inst': nr_inst,
-            'nr_attr': nr_attr,
-            'nr_class': nr_class,
-            'nr_missing_values': nr_missing_values,
-            'pct_missing_values': pct_missing_values,
-            'nr_inst_mv': nr_inst_mv,
-            'pct_inst_mv': pct_inst_mv,
-            'nr_attr_mv': nr_attr_mv,
-            'pct_attr_mv': pct_attr_mv,
-            'nr_outliers': nr_outliers,
+                   'nr_inst': nr_inst,
+                   'nr_attr': nr_attr,
+                   'nr_class': nr_class,
+                   'nr_missing_values': nr_missing_values,
+                   'pct_missing_values': pct_missing_values,
+                   'nr_inst_mv': nr_inst_mv,
+                   'pct_inst_mv': pct_inst_mv,
+                   'nr_attr_mv': nr_attr_mv,
+                   'pct_attr_mv': pct_attr_mv,
+                   'nr_outliers': nr_outliers,
 
-            'skewness_mean': skewness_mean,
-            'skewness_sd': skewness_sd,
-            'kurtosis_mean': kurtosis_mean,
-            'kurtosis_sd': kurtosis_sd,
-            'cor_mean': cor_mean,
-            'cor_sd': cor_sd,
-            'cov_mean': cov_mean,
-            'cov_sd': cov_sd,
-            'sparsity_mean': sparsity_mean,
-            'sparsity_sd': sparsity_sd,
-            'var_mean': var_mean,
-            'var_sd': var_sd,
+                   'skewness_mean': skewness_mean,
+                   'skewness_sd': skewness_sd,
+                   'kurtosis_mean': kurtosis_mean,
+                   'kurtosis_sd': kurtosis_sd,
+                   'cor_mean': cor_mean,
+                   'cor_sd': cor_sd,
+                   'cov_mean': cov_mean,
+                   'cov_sd': cov_sd,
+                   'sparsity_mean': sparsity_mean,
+                   'sparsity_sd': sparsity_sd,
+                   'var_mean': var_mean,
+                   'var_sd': var_sd,
 
-            'class_prob_mean': class_prob_mean,
-            'class_prob_std': class_prob_std,
-            'class_ent': class_ent,
-            'attr_ent_mean': attr_ent_mean,
-            'attr_ent_sd': attr_ent_sd,
-            'mut_inf_mean': mut_inf_mean,
-            'mut_inf_sd': mut_inf_sd,
-            'eq_num_attr': eq_num_attr,
-            'ns_ratio': ns_ratio,
+                   'class_prob_mean': class_prob_mean,
+                   'class_prob_std': class_prob_std,
+                   'class_ent': class_ent,
+                   'attr_ent_mean': attr_ent_mean,
+                   'attr_ent_sd': attr_ent_sd,
+                   'mut_inf_mean': mut_inf_mean,
+                   'mut_inf_sd': mut_inf_sd,
+                   'eq_num_attr': eq_num_attr,
+                   'ns_ratio': ns_ratio,
 
-            'nodes': nodes,
-            'leaves': leaves,
-            'leaves_branch_mean': leaves_branch_mean,
-            'leaves_branch_sd': leaves_branch_sd,
-            'nodes_per_attr': nodes_per_attr,
-            'leaves_per_class_mean': leaves_per_class_mean,
-            'leaves_per_class_sd': leaves_per_class_sd,
-            'var_importance_mean': var_importance_mean,
-            'var_importance_sd': var_importance_sd,
+                   'nodes': nodes,
+                   'leaves': leaves,
+                   'leaves_branch_mean': leaves_branch_mean,
+                   'leaves_branch_sd': leaves_branch_sd,
+                   'nodes_per_attr': nodes_per_attr,
+                   'leaves_per_class_mean': leaves_per_class_mean,
+                   'leaves_per_class_sd': leaves_per_class_sd,
+                   'var_importance_mean': var_importance_mean,
+                   'var_importance_sd': var_importance_sd,
 
-            'one_nn_mean': one_nn_mean,
-            'one_nn_sd': one_nn_sd,
-            'best_node_mean': best_node_mean,
-            'best_node_sd': best_node_sd,
-            'linear_discr_mean': linear_discr_mean,
-            'linear_discr_sd': linear_discr_sd,
-            'naive_bayes_mean': naive_bayes_mean,
-            'naive_bayes_sd': naive_bayes_sd
-        }
+                   'one_nn_mean': one_nn_mean,
+                   'one_nn_sd': one_nn_sd,
+                   'best_node_mean': best_node_mean,
+                   'best_node_sd': best_node_sd,
+                   'linear_discr_mean': linear_discr_mean,
+                   'linear_discr_sd': linear_discr_sd,
+                   'naive_bayes_mean': naive_bayes_mean,
+                   'naive_bayes_sd': naive_bayes_sd
+               }, True
