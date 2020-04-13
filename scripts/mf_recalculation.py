@@ -43,8 +43,8 @@ with engine.connect() as conn:
                 print('Skipping {} due to many features'.format(id))
                 continue
 
-            mf = MetaFeatures().calculate(df=df, class_column=class_column)
-            if mf['nr_inst'] == 0 and mf['nr_attr'] == 0:
+            mf, success = MetaFeatures().calculate(df=df, class_column=class_column)
+            if 'nr_class' not in mf or (mf['nr_inst'] == 0 and mf['nr_attr'] == 0):
                 print('Empty dataframe')
                 continue
 
