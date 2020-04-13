@@ -370,6 +370,12 @@ class MetaFeatures(object):
                        'nr_attr': df.shape[1],
                    }, False
 
+        # Extracting Missing Value Meta Features with AutoSklearn
+        nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
+        pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
+        nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
+        nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
+
         # Meta-Feature calculation does not work with missing data
         numeric = X.select_dtypes(include=['number']).columns
         if np.any(pd.isna(X)):
@@ -418,12 +424,6 @@ class MetaFeatures(object):
                              'naive_bayes', 'leaves_per_class']))
         mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
         f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
-
-        # Extracting Meta Features with AutoSklearn
-        nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
-        pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
-        nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
-        nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
 
         """
         Mapping values to Meta Feature variables
