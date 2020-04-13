@@ -85,7 +85,7 @@ class Dataset(Base):
     end_time = Column(DateTime)
     processed = Column(Integer)
     budget = Column(Integer)
-    depth = Column(Integer)
+    depth = Column(Integer, nullable=False, index=True)
     hashcode = Column(String(40), index=True)
 
     """
@@ -414,11 +414,18 @@ class Database(object):
         """
 
         # Load running datasets first
-        datasets = self.session.query(Dataset).filter(Dataset.status == RunStatus.RUNNING).limit(100).all()
+        datasets = self.session.query(Dataset)\
+            .filter(Dataset.status == RunStatus.RUNNING)\
+            .limit(100)\
+            .all()
 
         # Fallback to pending datasets
         if len(datasets) == 0:
-            datasets = self.session.query(Dataset).filter(Dataset.status == RunStatus.PENDING).limit(100).all()
+            datasets = self.session.query(Dataset)\
+                .filter(Dataset.status == RunStatus.PENDING)\
+                .order_by(Dataset.depth)\
+                .limit(100)\
+                .all()
 
         if len(datasets) == 0:
             return None
