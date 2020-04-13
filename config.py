@@ -179,10 +179,29 @@ class GenericConfig(Config):
     }
     dataset_budget = {
         'help': 'Sets dataset budget',
-        'default': 5
+        'default': 5,
+        'required': False
     }
+    max_pipeline_depth = {
+        'help': 'Maximum number of components in a single pipeline',
+        'default': 3,
+        'required': False
+    }
+
+
+class WorkerConfig(Config):
     timeout = {
         'help': 'Time in seconds to execute a single algorithm',
         'default': 1800,
+        'required': False
+    }
+    complete_pipelines = {
+        'help': 'Try to complete pipelines by only considering classifiers as algorithms',
+        'default': False,
+        'required': False
+    }
+    complete_pipeline_samples = {
+        'help': 'Number of samples of classifiers to use to obtain the final pipelines performance',
+        'default': 25,
         'required': False
     }

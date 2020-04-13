@@ -16,7 +16,7 @@ from typing import Optional, Tuple, Dict, TYPE_CHECKING
 from constants import AlgorithmStatus
 from data import delete_data
 from database import Database, Algorithm
-from methods import ALGORITHMS
+from methods import ALGORITHMS, CLASSIFIERS
 from utilities import multiclass_roc_auc_score, logloss
 
 if TYPE_CHECKING:
@@ -55,6 +55,8 @@ class Worker(object):
                  s3_config: str = None,
                  s3_bucket: str = None,
 
+                 complete_pipelines: bool = False,
+                 complete_pipeline_samples: int = 20,
                  max_pipeline_depth: int = 5,
                  verbose_metrics: bool = False):
 
@@ -66,6 +68,8 @@ class Worker(object):
         self.s3_config = s3_config
         self.s3_bucket = s3_bucket
 
+        self.complete_pipelines = complete_pipelines
+        self.complete_pipeline_samples = complete_pipeline_samples
         self.max_pipeline_depth = max_pipeline_depth
         self.verbose_metrics = verbose_metrics
 
@@ -155,16 +159,22 @@ class Worker(object):
         self.db.complete_algorithm(algorithm_id=algorithm_id, **res[1])
         LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
 
-        """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
-        if input_df.equals(res[0]):
+        depth = self.dataset.depth + 1
+        if self.complete_pipelines or depth >= self.max_pipeline_depth:
+            LOGGER.info('Pipeline completed. Do not store new dataset')
+        elif input_df.equals(res[0]):
+            """Check if transformed dataset res[0] equals input dataset. If False store transformed dataset to DB"""
             LOGGER.info(
                 'Transformed dataset equals input dataset {} and is not stored in the DB.'.format(self.dataset.id))
         else:
             LOGGER.info('Transformed dataset will be stored in DB.')
             new_dataset = pd.concat([res[0], dataset_class_column], axis=1)
-            depth = self.dataset.depth
-            depth += 1
-            self.core.add_dataset(new_dataset, class_column, depth=depth, budget=self.dataset.budget)
+
+            if depth + 1 >= self.max_pipeline_depth:
+                budget = min(self.dataset.budget, self.complete_pipeline_samples)
+            else:
+                budget = self.dataset.budget
+            self.core.add_dataset(new_dataset, class_column, depth=depth, budget=budget)
 
     def is_dataset_finished(self):
         """
@@ -218,7 +228,11 @@ class Worker(object):
         Choose a random algorithm to work on the dataset
         """
         try:
-            algo_type = random.choice(list(ALGORITHMS.keys()))
+            if self.complete_pipelines or self.dataset.depth + 1 >= self.max_pipeline_depth:
+                candidates = CLASSIFIERS.keys()
+            else:
+                candidates = ALGORITHMS.keys()
+            algo_type = random.choice(list(candidates))
             LOGGER.info('Starting new algorithm \'{}\'...'.format(algo_type))
             algorithm = Algorithm(algo_type,
                                   dataset_id=self.dataset.id,

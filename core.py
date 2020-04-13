@@ -45,11 +45,16 @@ class Core(object):
             port: int = None,
             query=None,
 
-            # Generic Conf,
+            # Generic Conf
             work_dir: str = None,
             timeout: int = None,
             cache_percentage: float = 0.9,
             dataset_budget: int = None,
+            max_pipeline_depth: int = 5,
+
+            # Worker Conf
+            complete_pipelines: bool = False,
+            complete_pipeline_samples: int = 20,
 
             # S3 Conf
             service_account: str = None,
@@ -63,6 +68,11 @@ class Core(object):
         self.work_dir = work_dir
         self.timeout = timeout
         self.dataset_budget = dataset_budget
+
+        self.complete_pipelines = complete_pipelines
+        self.complete_pipeline_samples = complete_pipeline_samples
+        self.max_pipeline_depth = max_pipeline_depth
+
         self.s3_config: str = service_account
         self.s3_bucket: str = bucket
 
@@ -243,8 +253,12 @@ class Core(object):
                 pbar = tqdm(total=ds.budget, ascii=True, initial=ds.processed, disable=not verbose)
 
                 """Creates Worker"""
-                worker = Worker(self.db, ds, self, timeout=self.timeout, s3_config=self.s3_config,
-                                s3_bucket=self.s3_bucket, verbose_metrics=self.verbose_metrics)
+                worker = Worker(self.db, ds, self, timeout=self.timeout,
+                                s3_config=self.s3_config, s3_bucket=self.s3_bucket,
+                                complete_pipelines=self.complete_pipelines,
+                                complete_pipeline_samples=self.complete_pipeline_samples,
+                                max_pipeline_depth=self.max_pipeline_depth,
+                                verbose_metrics=self.verbose_metrics)
 
                 """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""
                 while ds.status == RunStatus.RUNNING:

@@ -4,7 +4,7 @@ import logging
 
 import argparse
 
-from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig
+from config import S3Config, DatasetConfig, LogConfig, SQLConfig, GenericConfig, WorkerConfig
 
 
 def _get_core(args):
@@ -14,12 +14,14 @@ def _get_core(args):
     s3_conf = S3Config(args)
     log_conf = LogConfig(args)
     generic_conf = GenericConfig(args)
+    worker_conf = WorkerConfig(args)
 
     # Build params dictionary to pass to Core.
     core_args = sql_conf.to_dict()
     core_args.update(s3_conf.to_dict())
     core_args.update(log_conf.to_dict())
     core_args.update(generic_conf.to_dict())
+    core_args.update(worker_conf.to_dict())
 
     return Core(**core_args)
 
@@ -91,6 +93,7 @@ def _get_parser():
                              help='Whether to run this worker in cloud mode')
     worker_args.add_argument('--no-save', dest='save_files', action='store_false',
                              help="don't save models and metrics at all")
+    computation_args = WorkerConfig.get_parser()
 
     # Worker
     worker_parents = [
@@ -99,7 +102,8 @@ def _get_parser():
         sql_args,
         s3_args,
         log_args,
-        generic_args
+        generic_args,
+        computation_args
     ]
     worker = subparsers.add_parser('worker', parents=worker_parents,
                                    help='Start a single worker in foreground.')
