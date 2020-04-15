@@ -245,7 +245,8 @@ class Algorithm(Base):
     Relational columns
     """
     id = Column(HybridType, primary_key=True, autoincrement=True)
-    dataset_id = Column(HybridType, ForeignKey('datasets.id'), nullable=False)
+    input_dataset = Column(HybridType, ForeignKey('datasets.id'), nullable=False)
+    output_dataset = Column(HybridType, ForeignKey('datasets.id'), nullable=True)
 
     """
     Algorithm columns
@@ -302,7 +303,8 @@ class Algorithm(Base):
 
     def __init__(self,
                  algorithm: str,
-                 dataset_id: int,
+                 input_dataset: int,
+                 output_dataset: Optional[int],
                  id: int = None,
                  status: AlgorithmStatus = None,
                  start_time: datetime = None,
@@ -314,7 +316,8 @@ class Algorithm(Base):
         self.algorithm: str = algorithm
         self.status = status
         self.id: Optional[int] = id
-        self.dataset_id: int = dataset_id
+        self.input_dataset: int = input_dataset
+        self.output_dataset: Optional[int] = output_dataset
         self.start_time: Optional[datetime] = start_time
         self.end_time: Optional[datetime] = end_time
         self.error_message: Optional[str] = error_message
@@ -336,16 +339,16 @@ class Algorithm(Base):
     def default_config(self) -> Configuration:
         return self.cs.get_default_configuration()
 
-    def instance(self, params: Configuration = None) -> BaseEstimator:
+    def instance(self, params: dict = None) -> BaseEstimator:
         if params is None:
             if self.hyperparameter_values is None:
-                params = self.random_config()
+                params = self.random_config().get_dictionary()
             else:
                 params = self.hyperparameter_values
 
+        instance = ALGORITHMS[self.algorithm](**params)
         # noinspection PyTypeChecker
         # EstimatorComponent inherits from BaseEstimator
-        instance = ALGORITHMS[self.algorithm](**params.get_dictionary())
         return instance
 
     def __repr__(self):
@@ -414,17 +417,17 @@ class Database(object):
         """
 
         # Load running datasets first
-        datasets = self.session.query(Dataset)\
-            .filter(Dataset.status == RunStatus.RUNNING)\
-            .limit(100)\
+        datasets = self.session.query(Dataset) \
+            .filter(Dataset.status == RunStatus.RUNNING) \
+            .limit(100) \
             .all()
 
         # Fallback to pending datasets
         if len(datasets) == 0:
-            datasets = self.session.query(Dataset)\
-                .filter(Dataset.status == RunStatus.PENDING)\
-                .order_by(Dataset.depth)\
-                .limit(100)\
+            datasets = self.session.query(Dataset) \
+                .filter(Dataset.status == RunStatus.PENDING) \
+                .order_by(Dataset.depth) \
+                .limit(100) \
                 .all()
 
         if len(datasets) == 0:
@@ -449,7 +452,7 @@ class Database(object):
         Args:
             dataset_id: id of the corresponding dataset
         """
-        n = self.session.query(Algorithm).filter(Algorithm.dataset_id == dataset_id).count()
+        n = self.session.query(Algorithm).filter(Algorithm.input_dataset == dataset_id).count()
         return n
 
     # ##########################################################################
@@ -474,12 +477,15 @@ class Database(object):
         return algorithm
 
     @try_with_session(commit=True)
-    def complete_algorithm(self, algorithm_id, accuracy: float = None, f1: float = None, precision: float = None,
+    def complete_algorithm(self, algorithm_id, dataset_id: Optional[int], accuracy: float = None, f1: float = None,
+                           precision: float = None,
                            recall: float = None, neg_log_loss: float = None, roc_auc: float = None):
-
         """Set all the parameters on a algorithm that haven't yet been set, and mark it as complete."""
-
         algorithm = self.session.query(Algorithm).get(algorithm_id)
+
+        algorithm.output_dataset = dataset_id
+        algorithm.end_time = datetime.now()
+        algorithm.status = AlgorithmStatus.COMPLETE
 
         algorithm.accuracy = accuracy
         algorithm.f1_score = f1
@@ -487,8 +493,6 @@ class Database(object):
         algorithm.recall = recall
         algorithm.neg_log_loss = neg_log_loss
         algorithm.roc_auc_score = roc_auc
-        algorithm.end_time = datetime.now()
-        algorithm.status = AlgorithmStatus.COMPLETE
 
     @try_with_session(commit=True)
     def mark_algorithm_errored(self, algorithm_id, error_message):

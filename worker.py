@@ -155,10 +155,7 @@ class Worker(object):
         class_column = self.dataset.class_column
         input_df, dataset_class_column = input_df.drop(class_column, axis=1), input_df[class_column]
 
-        """Call complete_algorithm to save the algorithm to the database."""
-        self.db.complete_algorithm(algorithm_id=algorithm_id, **res[1])
-        LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
-
+        new_id = None
         depth = self.dataset.depth + 1
         if self.complete_pipelines or depth >= self.max_pipeline_depth:
             LOGGER.info('Pipeline completed. Do not store new dataset')
@@ -174,7 +171,11 @@ class Worker(object):
                 budget = min(self.dataset.budget, self.complete_pipeline_samples)
             else:
                 budget = self.dataset.budget
-            self.core.add_dataset(new_dataset, class_column, depth=depth, budget=budget)
+            new_id = self.core.add_dataset(new_dataset, class_column, depth=depth, budget=budget).id
+
+        """Call complete_algorithm to save the algorithm to the database."""
+        self.db.complete_algorithm(algorithm_id=algorithm_id, dataset_id=new_id, **res[1])
+        LOGGER.info('Saved algorithm {}.'.format(algorithm_id))
 
     def is_dataset_finished(self):
         """
@@ -235,7 +236,8 @@ class Worker(object):
             algo_type = random.choice(list(candidates))
             LOGGER.info('Starting new algorithm \'{}\'...'.format(algo_type))
             algorithm = Algorithm(algo_type,
-                                  dataset_id=self.dataset.id,
+                                  input_dataset=self.dataset.id,
+                                  output_dataset=None,
                                   status=AlgorithmStatus.RUNNING,
                                   start_time=datetime.now(),
                                   host=HOSTNAME)
@@ -266,7 +268,7 @@ class Worker(object):
         try:
             wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout, logger=self.subprocess_logger)(
                 self.transform_dataset)
-            instance = algorithm.instance(params)
+            instance = algorithm.instance(params.get_dictionary())
             res = wrapper(instance)
             if wrapper.exit_status is pynisher2.TimeoutException:
                 raise TimeoutError('Timeout')
