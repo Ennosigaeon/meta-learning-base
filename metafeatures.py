@@ -129,7 +129,7 @@ class MetaFeature(AbstractMetaFeature):
 
 class NumberOfMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
-        X_numeric = X.select_dtypes(include=['float64', 'int64'])
+        X_numeric = X.select_dtypes(include=['number'])
         X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
@@ -151,7 +151,7 @@ class NumberOfMissingValues(MetaFeature):
 
 class PercentageOfMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
-        X_numeric = X.select_dtypes(include=['float64', 'int64'])
+        X_numeric = X.select_dtypes(include=['number'])
         X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
@@ -173,7 +173,7 @@ class PercentageOfMissingValues(MetaFeature):
 
 class NumberOfInstancesWithMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
-        X_numeric = X.select_dtypes(include=['float64', 'int64'])
+        X_numeric = X.select_dtypes(include=['number'])
         X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
@@ -194,7 +194,7 @@ class NumberOfInstancesWithMissingValues(MetaFeature):
 
 class NumberOfFeaturesWithMissingValues(MetaFeature):
     def _calculate(self, X, y, categorical):
-        X_numeric = X.select_dtypes(include=['float64', 'int64'])
+        X_numeric = X.select_dtypes(include=['number'])
         X_object = X.select_dtypes(include=['category', 'object'])
 
         if X_object.empty:
