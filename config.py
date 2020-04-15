@@ -184,7 +184,7 @@ class GenericConfig(Config):
     }
     max_pipeline_depth = {
         'help': 'Maximum number of components in a single pipeline',
-        'default': 3,
+        'default': 4,
         'required': False
     }
 
@@ -202,6 +202,6 @@ class WorkerConfig(Config):
     }
     complete_pipeline_samples = {
         'help': 'Number of samples of classifiers to use to obtain the final pipelines performance',
-        'default': 25,
+        'default': 20,
         'required': False
     }
