@@ -401,7 +401,7 @@ class MetaFeatures(object):
         for i in X.columns:
             col = X[i]
             if i in numeric:
-                if not (abs(col - col.iloc[0]) > 1e-10).any():
+                if not (abs(col - col.iloc[0]) > 1e-10).any() or (~np.isfinite(col)).all():
                     X.drop(i, inplace=True, axis=1)
             else:
                 if not (col != col.iloc[0]).any():
