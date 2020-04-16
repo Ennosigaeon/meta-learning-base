@@ -10,11 +10,11 @@ Download other projects and install them
 ```bash
 cd ..
 git clone https://gitlab.usu-research.ml/research/automl/sklearn-components.git
-pip3 install -r sklearn-components/requirements.txt
-pip3 install -e sklearn-components
+sudo pip3 install -r sklearn-components/requirements.txt
+sudo pip3 install -e sklearn-components
 
 git clone https://github.com/Ennosigaeon/pynisher.git
-pip3 install -e pynisher
+sudo pip3 install -e pynisher
 ```
 
 Install system-packages
@@ -22,8 +22,9 @@ Install system-packages
 sudo apt install libpq-dev
 ```
 
-Install requirements
+Clone meta-learning-base project and install requirements
 ```bash
+git clone http://gitlab.usu-research.ml/research/automl/meta-learning-base.git
 pip3 install -r meta-learning-base/requirements.txt
 ```
 
@@ -37,6 +38,10 @@ vm.overcommit_ratio=100
 sysctl -p
 ```
 
+Add limbo configuration to assets/
+```bash
+copy file to VM with scp then move it in assets/
+```
 
 ## Running the applicaion
 
