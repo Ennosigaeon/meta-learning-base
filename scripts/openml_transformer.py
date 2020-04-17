@@ -1,22 +1,19 @@
-from datetime import datetime
-
 import time
-from ConfigSpace import Configuration
-from sklearn.base import BaseEstimator, is_classifier
-from ConfigSpace.configuration_space import Configuration
-from sqlalchemy.engine.url import URL
+from datetime import datetime
+from typing import Dict, List, Any, Tuple, Callable
 
+import numpy as np
+import openml
+import pandas as pd
+from ConfigSpace.configuration_space import Configuration
+from sklearn.base import is_classifier
+from sqlalchemy import create_engine
+
+from config import DatasetConfig
 from constants import AlgorithmStatus
 from core import Core
-import openml
-from automl.components.classification import _classifiers
-from numpy import nan
-from sqlalchemy import create_engine
-import pandas as pd
-from config import DatasetConfig
-from methods import ALGORITHMS
-import numpy as np
 from database import Database, Algorithm
+from methods import ALGORITHMS
 
 mapping = {
     'sklearn.ensemble.forest.RandomForestClassifier': 'random_forest',
@@ -55,8 +52,7 @@ mapping = {
     'sklearn.linear_model._stochastic_gradient.SGDClassifier': 'sgd',
     'sklearn.neural_network.multilayer_perceptron.MLPClassifier': 'mlp_classifier',
     'sklearn.preprocessing.data.RobustScaler': 'robust_scaler',
-    'sklearn.preprocessing.data.PolynomialFeatures': 'polynomial',
-    None: None
+    'sklearn.preprocessing.data.PolynomialFeatures': 'polynomial'
 }
 
 
@@ -75,7 +71,23 @@ def get_dataset(id):
     return X, y, dataset_conf
 
 
-def init_preprocessor(X, y, component, hp):
+def delete_hp(names: List[str], hp: Dict[str, Any]):
+    for name in names:
+        if name in hp:
+            del hp[name]
+    return hp
+
+
+def convert_hp(types: List[Tuple[str, Callable]], hp: Dict[str, Any]):
+    for name, func in types:
+        if name in hp:
+            hp[name] = func(hp[name])
+    return hp
+
+
+def init_component(hp):
+    hp = hp.replace('true', True)
+    hp = hp.replace('false', False)
     for key in hp.keys():
         try:
             if isinstance(hp[key], str):
@@ -88,49 +100,40 @@ def init_preprocessor(X, y, component, hp):
                 hp[key] = False
         except:
             hp[key] = hyperparameter[key]
+    return hp
+
+
+def init_preprocessor(X, y, component, hp):
+    hp = init_component(hp)
+    hp = delete_hp(['copy', 'verbose', 'random_state', 'memory'], hp)
 
     if component.name().endswith('ImputationComponent'):
-        if 'copy' in hp:
-            del hp['copy']
-        if 'fill_value' in hp:
-            del hp['fill_value']
-        if 'missing_values' in hp:
-            del hp['missing_values']
-        if 'verbose' in hp:
-            del hp['verbose']
+        hp = delete_hp(['fill_value', 'missing_values'], hp)
 
     if component.name().endswith('StandardScalerComponent'):
-        if 'copy' in hp:
-            del hp['copy']
+        pass
 
     if component.name().endswith('PCAComponent'):
-        if 'copy' in hp:
-            del hp['copy']
-        if 'random_state' in hp:
-            del hp['random_state']
         if 'svd_solver' in hp and hp['svd_solver'] == 'auto':
             if max(*X.shape) > 500000:
                 hp['svd_solver'] = 'full'
                 del hp['iterated_power']
             else:
                 hp['svd_solver'] = 'randomized'
-        elif ('n_components' in hp and hp['n_components'] is None) or ('n_components' in hp and hp['n_components'] == 'null') or ('n_components' in hp and hp['n_components'] == 'None'):
+        elif ('n_components' in hp and hp['n_components'] is None) or (
+                'n_components' in hp and hp['n_components'] == 'null') or (
+                'n_components' in hp and hp['n_components'] == 'None'):
             hp['keep_variance'] = 1.0
-            del hp['n_components']
         if 'n_components' in hp and isinstance(hp['n_components'], float):
             hp['keep_variance'] = hp['n_components'] / min(*X.shape)
-            del hp['n_components']
         if 'iterated_power' in hp and hp['iterated_power'] == 'auto':
             if 'keep_variance' in hp and hp['keep_variance'] < (0.1 * min(*X.shape)):
                 hp['iterated_power'] = 4
             else:
                 hp['iterated_power'] = 7
-        if 'n_components' in hp:
-            del hp['n_components']
+        hp = delete_hp(['n_components'], hp)
 
     if component.name().endswith('BinarizerComponent'):
-        if 'copy' in hp:
-            del hp['copy']
         if 'threshold' in hp:
             hp['threshold_factor'] = hp['threshold'] / np.mean(X.var())
             del hp['threshold']
@@ -157,13 +160,9 @@ def init_preprocessor(X, y, component, hp):
             hp['pooling_func'] = 'median'
         if 'pooling_func' in hp and 'max' in hp['pooling_func']:
             hp['pooling_func'] = 'max'
-        if 'connectivity' in hp:
-            del hp['connectivity']
-        if 'memory' in hp:
-            del hp['memory']
         if 'n_clusters' in hp:
             hp['n_clusters_factor'] = hp['n_clusters'] / X.shape[1]
-            del hp['n_clusters']
+        hp = delete_hp(['connectivity', 'n_clusters'], hp)
 
     if component.name().endswith('OneHotEncoderComponent'):
         return algorithm.get_hyperparameter_search_space().get_default_configuration()
@@ -179,20 +178,18 @@ def init_preprocessor(X, y, component, hp):
                 default[key] = hp[key]
         except:
             default[key] = hp[key]
-    if 'with_mean' in default and isinstance(default['with_mean'],str):
-        default['with_mean'] = bool(default['with_mean'])
-    if 'with_std' in default and isinstance(default['with_std'],str):
-        default['with_std'] = bool(default['with_std'])
-    if 'whiten' in default and isinstance(default['whiten'],str):
-        default['whiten'] = bool(default['whiten'])
-    if 'probability' in default and isinstance(default['probability'],str):
-        default['probability'] = bool(default['probability'])
-    if 'degree' in default and isinstance(default['degree'],float):
-        default['degree'] = int(default['degree'])
+
+    default = convert_hp([
+        ('with_mean', bool),
+        ('with_std', bool),
+        ('whiten', bool),
+        ('probability', bool),
+        ('degree', int),
+        ('iterated_power', int)
+    ], default)
+
     if 'iterated_power' in default and 'solver' in default and default['solver'] != 'randomized':
         del default['iterated_power']
-    if 'iterated_power' in default and isinstance(default['iterated_power'],float):
-        default['iterated_power'] = int(default['iterated_power'])
     if 'distance_threshold' in default and 'distance_threshold' not in hp:
         del default['distance_threshold']
     config = None
@@ -205,27 +202,18 @@ def init_preprocessor(X, y, component, hp):
 
 
 def init_classifier(X, y, component, hp):
-    for key in hp.keys():
-        try:
-            if isinstance(hp[key], str):
-                hp[key] = float(hyperparameter[key])
-            else:
-                hp[key] = hyperparameter[key]
-            if hp[key] == 'True':
-                hp[key] = True
-            elif hp[key] == 'False':
-                hp[key] = False
-        except:
-            hp[key] = hyperparameter[key]
+    hp = init_component(hp)
 
-    if component.name().endswith('RandomForest') or component.name().endswith('ExtraTreesClassifier') or component.name().endswith('DecisionTree'):
+    if component.name().endswith('RandomForest') or component.name().endswith(
+            'ExtraTreesClassifier') or component.name().endswith('DecisionTree'):
         if 'n_estimators' in hp and hp['n_estimators'] == 'warn':
             hp['n_estimators'] = 10
         elif 'max_depth' in hp and hp['max_depth'] is not None and not isinstance(hp['max_depth'], str):
             hp['max_depth_factor'] = (hp['max_depth'] / X.shape[1])
         if 'max_leaf_nodes' in hp and hp['max_leaf_nodes'] is not None and not isinstance(hp['max_leaf_nodes'], str):
             hp['max_leaf_nodes_factor'] = (hp['max_leaf_nodes'] / X.shape[0])
-        if 'min_samples_leaf' in hp and hp['min_samples_leaf'] is not None and not isinstance(hp['min_samples_leaf'], str):
+        if 'min_samples_leaf' in hp and hp['min_samples_leaf'] is not None and not isinstance(hp['min_samples_leaf'],
+                                                                                              str):
             hp['min_samples_leaf'] = (hp['min_samples_leaf'] / X.shape[0])
         if 'max_features' in hp and hp['max_features'] == 'null' or np.isnan(hp['max_features']):
             hp['max_features'] = 1.0
@@ -238,7 +226,8 @@ def init_classifier(X, y, component, hp):
                 hp['max_features'] = np.sqrt(X.shape[1]) / X.shape[1]
             elif hp['max_features'] == 'log2':
                 hp['max_features'] = np.log2(X.shape[1]) / X.shape[1]
-        if 'min_samples_split' in hp and hp['min_samples_split'] is not None and not isinstance(hp['min_samples_split'], str):
+        if 'min_samples_split' in hp and hp['min_samples_split'] is not None and not isinstance(hp['min_samples_split'],
+                                                                                                str):
             hp['min_samples_split'] = (hp['min_samples_split'] / X.shape[0])
         if 'max_leaf_nodes' in hp:
             del hp['max_leaf_nodes']
@@ -440,117 +429,101 @@ def init_classifier(X, y, component, hp):
         del default['epsilon']
     if 'n_iter_no_change' in default and 'solver' in default and default['solver'] not in ["sgd", "adam"]:
         del default['n_iter_no_change']
-    if 'max_iter' in default and isinstance(default['max_iter'], float):
-        default['max_iter'] = int(default['max_iter'])
-    if 'n_estimators' in default and isinstance(default['n_estimators'], float):
-        default['n_estimators'] = int(default['n_estimators'])
-    if 'leaf_size' in default and isinstance(default['leaf_size'], float):
-        default['leaf_size'] = int(default['leaf_size'])
-    if 'layer_1_size' in default and isinstance(default['layer_1_size'], float):
-        default['layer_1_size'] = int(default['layer_1_size'])
-    if 'layer_2_size' in default and isinstance(default['layer_2_size'], float):
-        default['layer_2_size'] = int(default['layer_2_size'])
-    if 'n_neighbors' in default and isinstance(default['n_neighbors'], float):
-        default['n_neighbors'] = int(default['n_neighbors'])
-    if 'probability' in default and isinstance(default['probability'],str):
-        default['probability'] = bool(default['probability'])
-    if 'fit_intercept' in default and isinstance(default['fit_intercept'],str):
-        default['fit_intercept'] = bool(default['fit_intercept'])
-    if 'shrinking' in default and isinstance(default['shrinking'],str):
-        default['shrinking'] = bool(default['shrinking'])
-    if 'shuffle' in default and isinstance(default['shuffle'],str):
-        default['shuffle'] = bool(default['shuffle'])
-    if 'dual' in default and isinstance(default['dual'],str):
-        default['dual'] = bool(default['dual'])
-    if 'bootstrap' in default and isinstance(default['bootstrap'],str):
-        default['bootstrap'] = bool(default['bootstrap'])
-    if 'early_stopping' in default and isinstance(default['early_stopping'],str):
-        default['early_stopping'] = bool(default['early_stopping'])
-    if 'oob_score' in default and isinstance(default['oob_score'],str):
-        default['oob_score'] = bool(default['oob_score'])
-    if 'degree' in default and isinstance(default['degree'], float):
-        default['degree'] = int(default['degree'])
-    if 'p' in default and isinstance(default['p'], float):
-        default['p'] = int(default['p'])
-    config = None
-    try:
-        config = Configuration(cs, default)
-    except ValueError as v:
-        print(v)
 
-    return config
+    default = convert_hp([('max_iter', int),
+                          ('n_estimators', int),
+                          ('leaf_size', int),
+                          ('layer_1_size', int),
+                          ('layer_2_size', int),
+                          ('n_neighbors', int),
+                          ('probability', bool),
+                          ('fit_intercept', bool),
+                          ('shrinking', bool),
+                          ('shuffle', bool),
+                          ('dual', bool),
+                          ('bootstrap', bool),
+                          ('early_stopping', bool),
+                          ('oob_score', bool),
+                          ('degree', int),
+                          ('p', int)
+                          ], default)
+    return Configuration(cs, default)
 
 
 core = Core(work_dir='data/')
 database = Database('sqlite', 'assets/ml-base.db', None, None, None, None, None)
 engine = create_engine('postgresql://admin:admin123@127.0.0.1:5432/openml_data')
-daten = pd.read_sql(sql='''select * from data where "0.name" = 'sklearn.impute._base.SimpleImputer';''',con=engine)
+daten = pd.read_sql(sql='''select * from data where "0.name" = 'sklearn.impute._base.SimpleImputer';''', con=engine)
 dataset = -1
 for index, pipeline in daten.iterrows():
-    if pipeline['0.name'] in mapping.keys() and pipeline['1.name'] in mapping.keys() and pipeline['2.name'] in mapping.keys() and pipeline['3.name'] in mapping.keys() and pipeline['4.name'] in mapping.keys() and pipeline['5.name'] in mapping.keys():
-        created_ids = []
-        if dataset != pipeline['dataset']:
-            try:
-                dataset = pipeline['dataset']
-                X, y, dataset_conf = get_dataset(dataset)
-                if dataset_conf is None:
-                    continue
-                df = pd.concat([X, y], axis=1)
-                created_dataset = core.add_dataset(df, dataset_conf.class_column, depth=0, name=dataset_conf.name)
-            except Exception as e:
-                print(e)
-                dataset = -1
-                continue
-        for step in ['0', '1', '2', '3', '4', '5']:
-            try:
-                if pipeline[step + '.name'] is None:
-                    break
-                algorithm_name = mapping[pipeline[step + '.name']]
-                algorithm = ALGORITHMS[algorithm_name]()
-                hyperparameter = pd.Series(eval(pipeline[step + '.hyperparameter']))
-                hyperparameter = hyperparameter.replace('true', True)
-                hyperparameter = hyperparameter.replace('false', False)
-                if is_classifier(algorithm):
-                    config = init_classifier(X, y, algorithm, hyperparameter)
-                    if config is not None:
-                        new_algorithm = Algorithm(algorithm_name, input_dataset=created_dataset.id, status=AlgorithmStatus.COMPLETE, output_dataset=None,
-                                              start_time=datetime.now(), end_time=datetime.now(), hyperparameter_values=config, host='openML')
-                        created_algorithm = database.create_algorithm(created_dataset.id, new_algorithm)
-                        created_ids.append(str(created_algorithm.id))
-                        database.complete_algorithm(created_algorithm.id, created_dataset.id, accuracy=pipeline['predictive_accuracy'], f1=pipeline['f_measure'], precision=pipeline['precision'], roc_auc=pipeline['area_under_roc_curve'], recall=pipeline['weighted_recall'])
-                    else:
-                        for i in created_ids:
-                            database.get_session().execute(
-                                '''delete from main.algorithms where main.algorithms.id = ''' + str(i) + ''';''')
-                        break
+    length = 0
+    step = '{}.name'.format(length)
+    abort = False
+    while step in pipeline:
+        if pipeline[step] not in mapping.keys():
+            abort = True
+            break
+        length += 1
+        step = '{}.name'.format(length)
+
+    if abort:
+        print('Unknown algorithm {}'.format(pipeline[step]))
+        continue
+
+    try:
+        dataset = pipeline['dataset']
+        X, y, dataset_conf = get_dataset(dataset)
+        if dataset_conf is None:
+            continue
+        df = pd.concat([X, y], axis=1)
+        dataset_id = core.add_dataset(df, dataset_conf.class_column, depth=0, name=dataset_conf.name).id
+    except Exception as e:
+        print(e)
+        dataset = -1
+        continue
+
+    created_ids = []
+    for step in range(length):
+        try:
+            algorithm_name = mapping[pipeline[step + '.name']]
+            algorithm = ALGORITHMS[algorithm_name]()
+            hyperparameter = pd.Series(eval(pipeline[step + '.hyperparameter']))
+            if is_classifier(algorithm):
+                config = init_classifier(X, y, algorithm, hyperparameter)
+            else:
+                config = init_preprocessor(X, y, algorithm, hyperparameter)
+
+            algorithm_id = database.create_algorithm(dataset_id,
+                                                     Algorithm(algorithm_name, input_dataset=dataset_id,
+                                                               status=AlgorithmStatus.COMPLETE,
+                                                               output_dataset=None,
+                                                               start_time=datetime.now(), end_time=datetime.now(),
+                                                               hyperparameter_values=config, host='openML')).id
+            created_ids.append(algorithm_id)
+
+            if is_classifier(algorithm):
+                database.complete_algorithm(algorithm_id, None,
+                                            accuracy=pipeline['predictive_accuracy'],
+                                            f1=pipeline['f_measure'],
+                                            precision=pipeline['precision'],
+                                            roc_auc=pipeline['area_under_roc_curve'],
+                                            recall=pipeline['weighted_recall'])
+                # TODO check if classifier can be in middle of pipeline
+                if step != length - 1:
+                    raise ValueError('Detected classifier in the middle of the pipeline')
+
+            else:
+                if hasattr(algorithm, 'fit_transform'):
+                    X = algorithm.fit_transform(pd.DataFrame(X), pd.Series(y))
                 else:
-                    config = init_preprocessor(X, y, algorithm, hyperparameter)
-                    if config is not None:
-                        new_algorithm = Algorithm(algorithm_name, input_dataset=created_dataset.id,
-                                                  status=AlgorithmStatus.COMPLETE, output_dataset=None,
-                                                  start_time=datetime.now(), end_time=datetime.now(),
-                                                  hyperparameter_values=config, host='openML')
-                        created_algorithm = database.create_algorithm(created_dataset.id, new_algorithm)
-                        created_ids.append(str(created_algorithm.id))
-                        if hasattr(algorithm, 'fit_transform'):
-                            X = algorithm.fit_transform(pd.DataFrame(X), pd.Series(y))
-                        else:
-                            X = algorithm.fit(pd.DataFrame(X), pd.Series(y)).transform(pd.DataFrame(X))
-                        X = pd.DataFrame(data=X, index=range(X.shape[0]), columns=range(X.shape[1]))
-                        df = pd.concat([X, y], axis=1)
-                        created_dataset = core.add_dataset(df, dataset_conf.class_column, depth=0, budget=0)
-                        database.complete_algorithm(created_algorithm.id, created_dataset.id)
-                    else:
-                        for i in created_ids:
-                            database.get_session().execute(
-                                '''delete from main.algorithms where main.algorithms.id = ''' + str(i) + ''';''')
-                        break
-            except Exception as e:
-                print(e)
-                print('deleting ids: ' + str(created_ids))
-                # db_url = URL(drivername='sqlite', database='assets/ml-base.db', username=None, password=None, host=None,
-                #              port=None, query=None)
-                # engine_to_delete = create_engine(db_url, pool_pre_ping=True, pool_recycle=3600, connect_args={"check_same_thread": False})
-                # engine_to_delete.execute('delete from main.algorithms where main.algorithms.id in ({})'.format(', '.join(created_ids)))
-                # engine_to_delete.dispose()
-                break
+                    X = algorithm.fit(pd.DataFrame(X), pd.Series(y)).transform(pd.DataFrame(X))
+                X = pd.DataFrame(data=X, index=range(X.shape[0]), columns=range(X.shape[1]))
+                df = pd.concat([X, y], axis=1)
+                dataset_id = core.add_dataset(df, dataset_conf.class_column, depth=0, budget=0).id
+                database.complete_algorithm(algorithm_id, dataset_id)
+        except Exception as e:
+            print('{}: {}'.format(pipeline['index'], e))
+            print('deleting ids: ' + str(created_ids))
+            database.get_session().execute('delete from main.algorithms where main.algorithms.id IN ({});'
+                                           .format(', '.join(created_ids)))
+            break
