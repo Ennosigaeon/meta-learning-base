@@ -19,11 +19,11 @@ db = Database('postgres', 'postgres', 'postgres', 'usu4867!', '35.242.255.138', 
 engine = db.engine
 with engine.connect() as conn:
     select_statement = '''
-        select id, "name", class_column from datasets
-        WHERE (nr_inst = 'NaN' or nr_attr = 'NaN' or nr_class = 'NaN' or nr_missing_values = 'NaN' or pct_missing_values = 'NaN' or nr_inst_mv = 'NaN' or pct_inst_mv = 'NaN' or nr_attr_mv = 'NaN' or pct_attr_mv = 'NaN' or nr_outliers = 'NaN' or skewness_mean = 'NaN' or skewness_sd = 'NaN' or kurtosis_mean = 'NaN' or kurtosis_sd = 'NaN' or cor_mean = 'NaN' or cor_sd = 'NaN' or cov_mean = 'NaN' or cov_sd = 'NaN' or sparsity_mean = 'NaN' or sparsity_sd = 'NaN' or var_mean = 'NaN' or var_sd = 'NaN' or class_prob_mean = 'NaN' or class_prob_std = 'NaN' or class_ent = 'NaN' or attr_ent_mean = 'NaN' or attr_ent_sd = 'NaN' or mut_inf_mean = 'NaN' or mut_inf_sd = 'NaN' or eq_num_attr = 'NaN' or ns_ratio = 'NaN' or nodes = 'NaN' or leaves = 'NaN' or leaves_branch_mean = 'NaN' or leaves_branch_sd = 'NaN' or nodes_per_attr = 'NaN' or leaves_per_class_mean = 'NaN' or leaves_per_class_sd = 'NaN' or var_importance_mean = 'NaN' or var_importance_sd = 'NaN' or one_nn_mean = 'NaN' or one_nn_sd = 'NaN' or best_node_mean = 'NaN' or best_node_sd = 'NaN' or linear_discr_mean = 'NaN' or linear_discr_sd = 'NaN' or naive_bayes_mean = 'NaN' or naive_bayes_sd = 'NaN' or
-               nr_inst IS NULL or nr_attr IS NULL or nr_class IS NULL or nr_missing_values IS NULL or pct_missing_values IS NULL or nr_inst_mv IS NULL or pct_inst_mv IS NULL or nr_attr_mv IS NULL or pct_attr_mv IS NULL or nr_outliers IS NULL or skewness_mean IS NULL or skewness_sd IS NULL or kurtosis_mean IS NULL or kurtosis_sd IS NULL or cor_mean IS NULL or cor_sd IS NULL or cov_mean IS NULL or cov_sd IS NULL or sparsity_mean IS NULL or sparsity_sd IS NULL or var_mean IS NULL or var_sd IS NULL or class_prob_mean IS NULL or class_prob_std IS NULL or class_ent IS NULL or attr_ent_mean IS NULL or attr_ent_sd IS NULL or mut_inf_mean IS NULL or mut_inf_sd IS NULL or eq_num_attr IS NULL or ns_ratio IS NULL or nodes IS NULL or leaves IS NULL or leaves_branch_mean IS NULL or leaves_branch_sd IS NULL or nodes_per_attr IS NULL or leaves_per_class_mean IS NULL or leaves_per_class_sd IS NULL or var_importance_mean IS NULL or var_importance_sd IS NULL or one_nn_mean IS NULL or one_nn_sd IS NULL or best_node_mean IS NULL or best_node_sd IS NULL or linear_discr_mean IS NULL or linear_discr_sd IS NULL or naive_bayes_mean IS NULL or naive_bayes_sd IS null)
-               and status != 'skipped'
-        order by id;
+        select * from datasets
+        WHERE (nr_class = 'NaN' or nr_missing_values = 'NaN' or pct_missing_values = 'NaN' or nr_inst_mv = 'NaN' or pct_inst_mv = 'NaN' or nr_attr_mv = 'NaN' or pct_attr_mv = 'NaN' or nr_outliers = 'NaN' or skewness_mean = 'NaN' or skewness_sd = 'NaN' or kurtosis_mean = 'NaN' or kurtosis_sd = 'NaN' or cor_mean = 'NaN' or cor_sd = 'NaN' or cov_mean = 'NaN' or cov_sd = 'NaN' or sparsity_mean = 'NaN' or sparsity_sd = 'NaN' or var_mean = 'NaN' or var_sd = 'NaN' or class_prob_mean = 'NaN' or class_prob_std = 'NaN' or class_ent = 'NaN' or attr_ent_mean = 'NaN' or attr_ent_sd = 'NaN' or mut_inf_mean = 'NaN' or mut_inf_sd = 'NaN' or eq_num_attr = 'NaN' or ns_ratio = 'NaN' or nodes = 'NaN' or leaves = 'NaN' or leaves_branch_mean = 'NaN' or leaves_branch_sd = 'NaN' or nodes_per_attr = 'NaN' or leaves_per_class_mean = 'NaN' or leaves_per_class_sd = 'NaN' or var_importance_mean = 'NaN' or var_importance_sd = 'NaN' or one_nn_mean = 'NaN' or one_nn_sd = 'NaN' or best_node_mean = 'NaN' or best_node_sd = 'NaN' or linear_discr_mean = 'NaN' or linear_discr_sd = 'NaN' or naive_bayes_mean = 'NaN' or naive_bayes_sd = 'NaN' or
+            nr_inst IS NULL or nr_attr IS NULL or nr_class IS NULL or nr_missing_values IS NULL or pct_missing_values IS NULL or nr_inst_mv IS NULL or pct_inst_mv IS NULL or nr_attr_mv IS NULL or pct_attr_mv IS NULL or nr_outliers IS NULL or skewness_mean IS NULL or skewness_sd IS NULL or kurtosis_mean IS NULL or kurtosis_sd IS NULL or cor_mean IS NULL or cor_sd IS NULL or cov_mean IS NULL or cov_sd IS NULL or sparsity_mean IS NULL or sparsity_sd IS NULL or var_mean IS NULL or var_sd IS NULL or class_prob_mean IS NULL or class_prob_std IS NULL or class_ent IS NULL or attr_ent_mean IS NULL or attr_ent_sd IS NULL or mut_inf_mean IS NULL or mut_inf_sd IS NULL or eq_num_attr IS NULL or ns_ratio IS NULL or nodes IS NULL or leaves IS NULL or leaves_branch_mean IS NULL or leaves_branch_sd IS NULL or nodes_per_attr IS NULL or leaves_per_class_mean IS NULL or leaves_per_class_sd IS NULL or var_importance_mean IS NULL or var_importance_sd IS NULL or one_nn_mean IS NULL or one_nn_sd IS NULL or best_node_mean IS NULL or best_node_sd IS NULL or linear_discr_mean IS NULL or linear_discr_sd IS NULL or naive_bayes_mean IS NULL or naive_bayes_sd IS null)
+            and status != 'skipped' and nr_inst != 0
+        order by id desc;
         '''
 
     rs = conn.execute(select_statement)
@@ -44,8 +44,64 @@ with engine.connect() as conn:
                 continue
 
             mf, success = MetaFeatures().calculate(df=df, class_column=class_column)
-            if 'nr_class' not in mf or (mf['nr_inst'] == 0 and mf['nr_attr'] == 0):
+            if mf['nr_inst'] == 0 or mf['nr_attr'] == 0:
                 print('Empty dataframe')
+                update_statement = '''
+                    UPDATE datasets SET 
+                        nr_inst=0,
+                        nr_attr=0,
+                        nr_class='NaN',
+                        nr_missing_values='NaN',
+                        pct_missing_values='NaN',
+                        nr_inst_mv='NaN',
+                        pct_inst_mv='NaN',
+                        nr_attr_mv='NaN',
+                        pct_attr_mv='NaN',
+                        nr_outliers='NaN',
+                        skewness_mean='NaN',
+                        skewness_sd='NaN',
+                        kurtosis_mean='NaN',
+                        kurtosis_sd='NaN',
+                        cor_mean='NaN',
+                        cor_sd='NaN',
+                        cov_mean='NaN',
+                        cov_sd='NaN',
+                        sparsity_mean='NaN',
+                        sparsity_sd='NaN',
+                        var_mean='NaN',
+                        var_sd='NaN',
+                        class_prob_mean='NaN',
+                        class_prob_std='NaN',
+                        class_ent='NaN',
+                        attr_ent_mean='NaN',
+                        attr_ent_sd='NaN',
+                        mut_inf_mean='NaN',
+                        mut_inf_sd='NaN',
+                        eq_num_attr='NaN',
+                        ns_ratio='NaN',
+                        nodes='NaN',
+                        leaves='NaN',
+                        leaves_branch_mean='NaN',
+                        leaves_branch_sd='NaN',
+                        nodes_per_attr='NaN',
+                        leaves_per_class_mean='NaN',
+                        leaves_per_class_sd='NaN',
+                        var_importance_mean='NaN',
+                        var_importance_sd='NaN',
+                        one_nn_mean='NaN',
+                        one_nn_sd='NaN',
+                        best_node_mean='NaN',
+                        best_node_sd='NaN',
+                        linear_discr_mean='NaN',
+                        linear_discr_sd='NaN',
+                        naive_bayes_mean='NaN',
+                        naive_bayes_sd='NaN'
+                    WHERE id={};
+                    '''.format(id)
+                conn.execute(update_statement)
+                continue
+            if 'nr_class' not in mf:
+                print('Calculation failed.')
                 continue
 
             for key, value in mf.items():
