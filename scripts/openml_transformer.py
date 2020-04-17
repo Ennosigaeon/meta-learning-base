@@ -2,12 +2,14 @@ import time
 from datetime import datetime
 from typing import Dict, List, Any, Tuple, Callable
 
+from numpy import nan
 import numpy as np
 import openml
 import pandas as pd
 from ConfigSpace.configuration_space import Configuration
 from sklearn.base import is_classifier
 from sqlalchemy import create_engine
+from sqlalchemy.engine.url import URL
 
 from config import DatasetConfig
 from constants import AlgorithmStatus
@@ -105,13 +107,10 @@ def init_component(hp):
 
 def init_preprocessor(X, y, component, hp):
     hp = init_component(hp)
-    hp = delete_hp(['copy', 'verbose', 'random_state', 'memory'], hp)
+    hp = delete_hp(['copy', 'verbose', 'random_state', 'memory', 'cache_size'], hp)
 
     if component.name().endswith('ImputationComponent'):
         hp = delete_hp(['fill_value', 'missing_values'], hp)
-
-    if component.name().endswith('StandardScalerComponent'):
-        pass
 
     if component.name().endswith('PCAComponent'):
         if 'svd_solver' in hp and hp['svd_solver'] == 'auto':
@@ -180,9 +179,11 @@ def init_preprocessor(X, y, component, hp):
             default[key] = hp[key]
 
     default = convert_hp([
+        ('max_bins', int),
         ('with_mean', bool),
         ('with_std', bool),
         ('whiten', bool),
+        ('add_indicator', bool),
         ('probability', bool),
         ('degree', int),
         ('iterated_power', int)
@@ -212,8 +213,7 @@ def init_classifier(X, y, component, hp):
             hp['max_depth_factor'] = (hp['max_depth'] / X.shape[1])
         if 'max_leaf_nodes' in hp and hp['max_leaf_nodes'] is not None and not isinstance(hp['max_leaf_nodes'], str):
             hp['max_leaf_nodes_factor'] = (hp['max_leaf_nodes'] / X.shape[0])
-        if 'min_samples_leaf' in hp and hp['min_samples_leaf'] is not None and not isinstance(hp['min_samples_leaf'],
-                                                                                              str):
+        if 'min_samples_leaf' in hp and hp['min_samples_leaf'] is not None and not isinstance(hp['min_samples_leaf'],str):
             hp['min_samples_leaf'] = (hp['min_samples_leaf'] / X.shape[0])
         if 'max_features' in hp and hp['max_features'] == 'null' or np.isnan(hp['max_features']):
             hp['max_features'] = 1.0
@@ -229,48 +229,29 @@ def init_classifier(X, y, component, hp):
         if 'min_samples_split' in hp and hp['min_samples_split'] is not None and not isinstance(hp['min_samples_split'],
                                                                                                 str):
             hp['min_samples_split'] = (hp['min_samples_split'] / X.shape[0])
-        if 'max_leaf_nodes' in hp:
-            del hp['max_leaf_nodes']
-        if 'max_depth' in hp:
-            del hp['max_depth']
         if 'min_impurity_split' in hp:
             del hp['min_impurity_split']
-        if 'n_jobs' in hp:
-            del hp['n_jobs']
-        if 'verbose' in hp:
-            del hp['verbose']
-        if 'warm_start' in hp:
-            del hp['warm_start']
         if 'presort' in hp:
             del hp['presort']
-        if 'class_weight' in hp:
-            del hp['class_weight']
-        if 'random_state' in hp:
-            del hp['random_state']
         if 'min_impurity_split' in hp:
             del hp['min_impurity_split']
 
     if component.name().endswith('GradientBoostingClassifier'):
-        if 'max_leaf_nodes' in hp and hp['max_leaf_nodes'] is not None and isinstance(hp['max_leaf_nodes'], int):
+        if 'max_leaf_nodes' in hp and hp['max_leaf_nodes'] is not None and not isinstance(hp['max_leaf_nodes'], str):
             hp['max_leaf_nodes_factor'] = (hp['max_leaf_nodes'] / X.shape[0])
-        if 'max_depth' in hp and hp['max_depth'] is not None and isinstance(hp['max_depth'], int):
+        if 'max_depth' in hp and hp['max_depth'] is not None and not isinstance(hp['max_depth'], str):
             hp['max_depth_factor'] = (hp['max_depth'] / X.shape[1])
-        if 'min_samples_leaf' in hp and hp['min_samples_leaf'] is not None and isinstance(hp['min_samples_leaf'], int):
+            del hp['max_depth']
+        if 'min_samples_leaf' in hp and hp['min_samples_leaf'] is not None and not isinstance(hp['min_samples_leaf'], str):
             hp['min_samples_leaf'] = (hp['min_samples_leaf'] / X.shape[0])
-        if 'verbose' in hp:
-            del hp['verbose']
-        if 'random_state' in hp:
-            del hp['random_state']
+        if 'max_bins' in hp and hp['max_bins'] == 256:
+            hp['max_bins'] = 255
+        if 'scoring' in hp and hp['scoring'] == 'null':
+            hp['scoring'] = 'accuracy'
+        if 'n_iter_no_change' in hp and hp['n_iter_no_change'] == 'null':
+            hp['n_iter_no_change'] = 0
 
     if component.name().endswith('LibSVM_SVC'):
-        if 'verbose' in hp:
-            del hp['verbose']
-        if 'random_state' in hp:
-            del hp['random_state']
-        if 'class_weight' in hp:
-            del hp['class_weight']
-        if 'cache_size' in hp:
-            del hp['cache_size']
         if 'max_iter' in hp:
             del hp['max_iter']
         if 'gamma' in hp and isinstance(hp['gamma'], str) and hp['gamma'] == 'auto':
@@ -304,18 +285,8 @@ def init_classifier(X, y, component, hp):
             del hp['binarize']
 
     if component.name().endswith('SGDClassifier'):
-        if 'class_weight' in hp:
-            del hp['class_weight']
         if 'n_iter_no_change' in hp:
             del hp['n_iter_no_change']
-        if 'n_jobs' in hp:
-            del hp['n_jobs']
-        if 'random_state' in hp:
-            del hp['random_state']
-        if 'warm_start' in hp:
-            del hp['warm_start']
-        if 'verbose' in hp:
-            del hp['verbose']
 
     if component.name().endswith('LinearDiscriminantAnalysis'):
         if 'n_components' in hp and np.isnan(hp['n_components']):
@@ -332,16 +303,6 @@ def init_classifier(X, y, component, hp):
             del hp['priors']
 
     if component.name().endswith('LogisticRegression'):
-        if 'class_weight' in hp:
-            del hp['class_weight']
-        if 'n_jobs' in hp:
-            del hp['n_jobs']
-        if 'random_state' in hp:
-            del hp['random_state']
-        if 'verbose' in hp:
-            del hp['verbose']
-        if 'warm_start' in hp:
-            del hp['warm_start']
         if 'multi_class' in hp and hp['multi_class'] == 'auto':
             if len(y.unique()) == 2 or hp['solver'] == 'liblinear':
                 hp['multi_class'] = 'ovr'
@@ -355,12 +316,6 @@ def init_classifier(X, y, component, hp):
             del hp['l1_ratio']
 
     if component.name().endswith('MLPClassifier'):
-        if 'random_state' in hp:
-            del hp['random_state']
-        if 'verbose' in hp:
-            del hp['verbose']
-        if 'warm_start' in hp:
-            del hp['warm_start']
         if 'batch_size' in hp:
             del hp['batch_size']
         if 'hidden_layer_sizes' in hp:
@@ -375,22 +330,23 @@ def init_classifier(X, y, component, hp):
             del hp['priors']
 
     if component.name().endswith('KNeighborsClassifier'):
-        if 'n_jobs' in hp:
-            del hp['n_jobs']
         if 'metric_params' in hp:
             del hp['metric_params']
+
+    hp = delete_hp(['copy', 'verbose', 'random_state', 'memory', 'cache_size', 'max_depth', 'max_leaf_nodes', 'n_jobs',
+                    'warm_start', 'class_weight'], hp)
 
     cs = algorithm.get_hyperparameter_search_space()
     default = cs.get_default_configuration()
     default = default.get_dictionary()
-    for key in hyperparameter.keys():
+    for key in hp.keys():
         try:
-            if isinstance(hyperparameter[key], str):
-                default[key] = float(hyperparameter[key])
+            if isinstance(hp[key], str):
+                default[key] = float(hp[key])
             else:
-                default[key] = hyperparameter[key]
+                default[key] = hp[key]
         except:
-            default[key] = hyperparameter[key]
+            default[key] = hp[key]
     if 'bootstrap' in default and 'oob_score' in default and default['bootstrap'] is False:
         del default['oob_score']
     if 'degree' in default and 'kernel' in default and default['kernel'] != 'poly':
@@ -435,12 +391,14 @@ def init_classifier(X, y, component, hp):
                           ('leaf_size', int),
                           ('layer_1_size', int),
                           ('layer_2_size', int),
+                          ('max_bins', int),
                           ('n_neighbors', int),
                           ('probability', bool),
                           ('fit_intercept', bool),
                           ('shrinking', bool),
                           ('shuffle', bool),
                           ('dual', bool),
+                          ('add_indicator', bool),
                           ('bootstrap', bool),
                           ('early_stopping', bool),
                           ('oob_score', bool),
@@ -454,12 +412,11 @@ core = Core(work_dir='data/')
 database = Database('sqlite', 'assets/ml-base.db', None, None, None, None, None)
 engine = create_engine('postgresql://admin:admin123@127.0.0.1:5432/openml_data')
 daten = pd.read_sql(sql='''select * from data where "0.name" = 'sklearn.impute._base.SimpleImputer';''', con=engine)
-dataset = -1
 for index, pipeline in daten.iterrows():
     length = 0
     step = '{}.name'.format(length)
     abort = False
-    while step in pipeline:
+    while step in pipeline and pipeline[step] is not None:
         if pipeline[step] not in mapping.keys():
             abort = True
             break
@@ -485,9 +442,9 @@ for index, pipeline in daten.iterrows():
     created_ids = []
     for step in range(length):
         try:
-            algorithm_name = mapping[pipeline[step + '.name']]
+            algorithm_name = mapping[pipeline[str(step) + '.name']]
             algorithm = ALGORITHMS[algorithm_name]()
-            hyperparameter = pd.Series(eval(pipeline[step + '.hyperparameter']))
+            hyperparameter = pd.Series(eval(pipeline[str(step) + '.hyperparameter']))
             if is_classifier(algorithm):
                 config = init_classifier(X, y, algorithm, hyperparameter)
             else:
@@ -499,7 +456,7 @@ for index, pipeline in daten.iterrows():
                                                                output_dataset=None,
                                                                start_time=datetime.now(), end_time=datetime.now(),
                                                                hyperparameter_values=config, host='openML')).id
-            created_ids.append(algorithm_id)
+            created_ids.append(str(algorithm_id))
 
             if is_classifier(algorithm):
                 database.complete_algorithm(algorithm_id, None,
@@ -524,6 +481,11 @@ for index, pipeline in daten.iterrows():
         except Exception as e:
             print('{}: {}'.format(pipeline['index'], e))
             print('deleting ids: ' + str(created_ids))
-            database.get_session().execute('delete from main.algorithms where main.algorithms.id IN ({});'
-                                           .format(', '.join(created_ids)))
+            db_url = URL(drivername='sqlite', database='assets/ml-base.db', username=None, password=None, host=None,
+                         port=None, query=None)
+            engine_to_delete = create_engine(db_url, pool_pre_ping=True, pool_recycle=3600,
+                                             connect_args={"check_same_thread": False})
+            engine_to_delete.execute(
+                'delete from main.algorithms where main.algorithms.id in ({})'.format(', '.join(created_ids)))
+            engine_to_delete.dispose()
             break
