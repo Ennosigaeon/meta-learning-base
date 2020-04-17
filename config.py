@@ -179,7 +179,7 @@ class GenericConfig(Config):
     }
     dataset_budget = {
         'help': 'Sets dataset budget',
-        'default': 5,
+        'default': 100,
         'required': False
     }
     max_pipeline_depth = {
