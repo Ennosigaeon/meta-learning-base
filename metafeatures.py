@@ -199,14 +199,14 @@ class NumberOfFeaturesWithMissingValues(MetaFeature):
 
         if X_object.empty:
             missing = ~np.isfinite(X_numeric)
-            return (missing.sum(axis=0) > 0).sum()
+            return int((missing.sum(axis=0) > 0).sum())
         else:
             missing_o = pd.isna(X_object)
             num_missing_o = (missing_o.sum(axis=0) > 0).sum()
 
             missing_n = ~np.isfinite(X_numeric)
             num_missing_n = (missing_n.sum(axis=0) > 0).sum()
-            return num_missing_n + num_missing_o
+            return int(num_missing_n + num_missing_o)
 
 
 class ClassOccurrences(MetaFeature):
