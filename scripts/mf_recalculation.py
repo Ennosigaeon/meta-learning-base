@@ -39,9 +39,6 @@ with engine.connect() as conn:
             local_file = '../data/' + name + '.parquet'
             df = load_data(local_file, s3_config='../assets/limbo-233520-a283e9f868c1.json',
                            s3_bucket='usu-mlb', name=name)
-            if df.shape[1] > 10000:
-                print('Skipping {} due to many features'.format(id))
-                continue
 
             mf, success = MetaFeatures().calculate(df=df, class_column=class_column)
             if mf['nr_inst'] == 0 or mf['nr_attr'] == 0:
