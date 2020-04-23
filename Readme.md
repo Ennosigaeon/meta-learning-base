@@ -59,7 +59,7 @@ mkdir data
 mkdir logfile
 
 screen
-python3 cli.py worker --work-dir ./data -sql-config assets/sql.yaml --s3-config assets/s3.yaml --logfile ./logfiles/log`
+python3 cli.py worker --work-dir ./data --sql-config assets/sql.yaml --s3-config assets/s3.yaml --logfile ./logfiles/log1`
 ```
 
 ### Using external storage and database

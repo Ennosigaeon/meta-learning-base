@@ -546,6 +546,14 @@ class Database(object):
         algorithm.status = AlgorithmStatus.ERRORED
         algorithm.end_time = datetime.now()
 
+        algorithm.accuracy = 0
+        algorithm.f1_score = 0
+        algorithm.precision = 0
+        algorithm.recall = 0
+        # Log loss is not limited. Value of 100 may be too small
+        algorithm.neg_log_loss = 100
+        algorithm.roc_auc_score = 0
+
     @try_with_session(commit=True)
     def mark_dataset_running(self, dataset_id: int) -> None:
         """
