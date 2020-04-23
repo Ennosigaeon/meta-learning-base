@@ -5,12 +5,16 @@ import hashlib
 from ConfigSpace.configuration_space import Configuration
 from builtins import object
 from datetime import datetime
+from typing import Optional, List
+
+import pandas as pd
+import numpy as np
+from ConfigSpace.configuration_space import Configuration
 from sklearn.base import BaseEstimator
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine, BigInteger
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from typing import Optional, List
+from sqlalchemy.orm import sessionmaker, Session
 
 from constants import AlgorithmStatus, RunStatus
 from data import load_data
@@ -234,6 +238,18 @@ class Dataset(Base):
     def __repr__(self):
         return "<{}: {} classes, {} features, {} rows>".format(self.name, self.nr_class, self.nr_attr, self.nr_inst)
 
+    def get_mf(self):
+        return [self.nr_inst, self.nr_attr, self.nr_class, self.nr_missing_values, self.pct_missing_values,
+                self.nr_inst_mv, self.pct_inst_mv, self.nr_attr_mv, self.pct_attr_mv, self.nr_outliers,
+                self.skewness_mean, self.skewness_sd, self.kurtosis_mean, self.kurtosis_sd, self.cor_mean, self.cor_sd,
+                self.cov_mean, self.cov_sd, self.sparsity_mean, self.sparsity_sd, self.var_mean, self.var_sd,
+                self.class_prob_mean, self.class_prob_std, self.class_ent, self.attr_ent_mean, self.attr_ent_sd,
+                self.mut_inf_mean, self.mut_inf_sd, self.eq_num_attr, self.ns_ratio, self.nodes, self.leaves,
+                self.leaves_branch_mean, self.leaves_branch_sd, self.nodes_per_attr, self.leaves_per_class_mean,
+                self.leaves_per_class_sd, self.var_importance_mean, self.var_importance_sd, self.one_nn_mean,
+                self.one_nn_sd, self.best_node_mean, self.best_node_sd, self.linear_discr_mean, self.linear_discr_sd,
+                self.naive_bayes_mean, self.naive_bayes_sd]
+
 
 class Algorithm(Base):
     __tablename__ = 'algorithms'
@@ -311,6 +327,13 @@ class Algorithm(Base):
                  end_time: datetime = None,
                  error_message: str = None,
                  hyperparameter_values: Configuration = None,
+                 hyperparameter_values_64: str = None,
+                 accuracy: float = None,
+                 f1_score: float = None,
+                 precision: float = None,
+                 recall: float = None,
+                 neg_log_loss: float = None,
+                 roc_auc_score: float = None,
                  host=None):
 
         self.algorithm: str = algorithm
@@ -321,8 +344,19 @@ class Algorithm(Base):
         self.start_time: Optional[datetime] = start_time
         self.end_time: Optional[datetime] = end_time
         self.error_message: Optional[str] = error_message
-        self.hyperparameter_values = hyperparameter_values
+        if hyperparameter_values is not None:
+            self.hyperparameter_values = hyperparameter_values
+        else:
+            self.hyperparameter_values_64 = hyperparameter_values_64
         self.host = host
+
+        self.accuracy = accuracy
+        self.f1_score = f1_score
+        self.precision = precision
+        self.recall = recall
+        self.neg_log_loss = neg_log_loss
+        self.roc_auc_score = roc_auc_score
+
         self._load_cs()
 
     def _load_cs(self):
@@ -350,6 +384,12 @@ class Algorithm(Base):
         # noinspection PyTypeChecker
         # EstimatorComponent inherits from BaseEstimator
         return instance
+
+    def get_performance(self):
+        return [self.accuracy, self.f1_score, self.precision, self.recall, self.neg_log_loss, self.roc_auc_score]
+
+    def get_config_array(self):
+        return Configuration( self.cs, self.hyperparameter_values).get_array()
 
     def __repr__(self):
         params = '\n'.join(
@@ -381,7 +421,7 @@ class Database(object):
         db_url = URL(drivername=dialect, database=database, username=username,
                      password=password, host=host, port=port, query=query)
         self.engine = create_engine(db_url, pool_pre_ping=True, pool_recycle=3600)
-        self.session = None
+        self.session: Optional[Session] = None
         self.get_session = sessionmaker(bind=self.engine,
                                         expire_on_commit=False)
 
@@ -540,3 +580,6 @@ class Database(object):
             dataset.end_time = datetime.now()
         else:
             raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))
+
+    def export_db(self, max_depth: int = 3, algorithm: bool = True):
+       pass

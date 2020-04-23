@@ -300,3 +300,6 @@ class Core(object):
             finally:
                 del datasets
                 del worker
+
+    def export_db(self):
+        return self.db.export_db()

@@ -56,6 +56,12 @@ def _enter_data(args):
     return dataset.id
 
 
+def _export_db(args):
+    core = _get_core(args)
+    core.export_db()
+    print('Export db')
+
+
 def _get_parser():
     logging_args = argparse.ArgumentParser(add_help=False)
     logging_args.add_argument('-v', '--verbose', action='count', default=0)
@@ -110,6 +116,16 @@ def _get_parser():
     worker.set_defaults(action=_work)
     worker.add_argument('--datasets', help='Only train on datasets with these ids', nargs='+')
     worker.add_argument('--total-time', help='Number of seconds to run worker', type=int)
+
+    export_db_parents = [
+        logging_args,
+        log_args,
+        sql_args,
+        generic_args
+    ]
+    export_db = subparsers.add_parser('export_db', parents=export_db_parents,
+                                      help='Export all data sets and algorithms to a DataFrame')
+    export_db.set_defaults(action=_export_db)
 
     return parser
 
