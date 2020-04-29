@@ -1,14 +1,13 @@
 from __future__ import absolute_import, unicode_literals
 
 import hashlib
-
-from ConfigSpace.configuration_space import Configuration
+import pickle
 from builtins import object
 from datetime import datetime
 from typing import Optional, List
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from ConfigSpace.configuration_space import Configuration
 from sklearn.base import BaseEstimator
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine, BigInteger
@@ -23,7 +22,7 @@ from utilities import base_64_to_object, object_to_base_64
 
 
 class DBSession(object):
-    def __init__(self, db, commit=False):
+    def __init__(self, db: 'Database', commit=False):
         self.db = db
         self.commit = commit
 
@@ -72,6 +71,7 @@ Base = declarative_base()
 
 class Dataset(Base):
     __tablename__ = 'datasets'
+    # __table_args__ = {'schema': 'mlb'}
 
     HybridType = Integer()
     HybridType = HybridType.with_variant(BigInteger(), 'postgresql')
@@ -253,6 +253,7 @@ class Dataset(Base):
 
 class Algorithm(Base):
     __tablename__ = 'algorithms'
+    # __table_args__ = {'schema': 'mlb'}
 
     HybridType = Integer()
     HybridType = HybridType.with_variant(BigInteger(), 'postgresql')
@@ -389,7 +390,7 @@ class Algorithm(Base):
         return [self.accuracy, self.f1_score, self.precision, self.recall, self.neg_log_loss, self.roc_auc_score]
 
     def get_config_array(self):
-        return Configuration( self.cs, self.hyperparameter_values).get_array()
+        return Configuration(self.cs, self.hyperparameter_values).get_array()
 
     def __repr__(self):
         params = '\n'.join(
@@ -589,5 +590,149 @@ class Database(object):
         else:
             raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))
 
-    def export_db(self, max_depth: int = 3, algorithm: bool = True):
-       pass
+    def export_db(self, max_depth: int = 4, algorithm: bool = True):
+        with self.engine.connect() as con:
+            con.execute('SET search_path TO mlb;')
+            con.execute('SET work_mem TO "2000MB";')
+
+            con.execute('''
+            create materialized view if not exists unique_algorithms as
+            select MIN(id) as id, COUNT(id) as count, algorithm, hyperparameter_values_64, input_dataset, output_dataset,
+            AVG(accuracy) as accuracy, AVG(f1_score) as f1_score, AVG("precision") as "precision", AVG(recall) as recall, AVG(neg_log_loss) as neg_log_loss, AVG(roc_auc_score) as roc_auc_score
+            from mlb.algorithms a
+            group by algorithm, hyperparameter_values_64, input_dataset, output_dataset
+            ''')
+
+            for depth in range(2, max_depth):
+                con.execute('drop MATERIALIZED view if exists pipelines;')
+
+                query = '''create materialized view pipelines as select'''
+                query += ','.join(['''
+                    d{d}.nr_inst as d{d}_nr_inst,
+                    d{d}.nr_attr as d{d}_nr_attr,
+                    d{d}.nr_class as d{d}_nr_class,
+                    d{d}.nr_missing_values as d{d}_nr_missing_values,
+                    d{d}.pct_missing_values as d{d}_pct_missing_values,
+                    d{d}.nr_inst_mv as d{d}_nr_inst_mv,
+                    d{d}.pct_inst_mv as d{d}_pct_inst_mv,
+                    d{d}.nr_attr_mv as d{d}_nr_attr_mv,
+                    d{d}.pct_attr_mv as d{d}_pct_attr_mv,
+                    d{d}.nr_outliers as d{d}_nr_outliers,
+                    d{d}.skewness_mean as d{d}_skewness_mean,
+                    d{d}.skewness_sd as d{d}_skewness_sd,
+                    d{d}.kurtosis_mean as d{d}_kurtosis_mean,
+                    d{d}.kurtosis_sd as d{d}_kurtosis_sd,
+                    d{d}.cor_mean as d{d}_cor_mean,
+                    d{d}.cor_sd as d{d}_cor_sd,
+                    d{d}.cov_mean as d{d}_cov_mean,
+                    d{d}.cov_sd as d{d}_cov_sd,
+                    d{d}.sparsity_mean as d{d}_sparsity_mean,
+                    d{d}.sparsity_sd as d{d}_sparsity_sd,
+                    d{d}.var_mean as d{d}_var_mean,
+                    d{d}.var_sd as d{d}_var_sd,
+                    d{d}.class_prob_mean as d{d}_class_prob_mean,
+                    d{d}.class_prob_std as d{d}_class_prob_std,
+                    d{d}.class_ent as d{d}_class_ent,
+                    d{d}.attr_ent_mean as d{d}_attr_ent_mean,
+                    d{d}.attr_ent_sd as d{d}_attr_ent_sd,
+                    d{d}.mut_inf_mean as d{d}_mut_inf_mean,
+                    d{d}.mut_inf_sd as d{d}_mut_inf_sd,
+                    d{d}.eq_num_attr as d{d}_eq_num_attr,
+                    d{d}.ns_ratio as d{d}_ns_ratio,
+                    d{d}.nodes as d{d}_nodes,
+                    d{d}.leaves as d{d}_leaves,
+                    d{d}.leaves_branch_mean as d{d}_leaves_branch_mean,
+                    d{d}.leaves_branch_sd as d{d}_leaves_branch_sd,
+                    d{d}.nodes_per_attr as d{d}_nodes_per_attr,
+                    d{d}.leaves_per_class_mean as d{d}_leaves_per_class_mean,
+                    d{d}.leaves_per_class_sd as d{d}_leaves_per_class_sd,
+                    d{d}.var_importance_mean as d{d}_var_importance_mean,
+                    d{d}.var_importance_sd as d{d}_var_importance_sd,
+                    d{d}.one_nn_mean as d{d}_one_nn_mean,
+                    d{d}.one_nn_sd as d{d}_one_nn_sd,
+                    d{d}.best_node_mean as d{d}_best_node_mean,
+                    d{d}.best_node_sd as d{d}_best_node_sd,
+                    d{d}.linear_discr_mean as d{d}_linear_discr_mean,
+                    d{d}.linear_discr_sd as d{d}_linear_discr_sd,
+                    d{d}.naive_bayes_mean as d{d}_naive_bayes_mean,
+                    d{d}.naive_bayes_sd as d{d}_naive_bayes_sd,
+                    a{a}.algorithm as a{a}_algorithm,
+                    a{a}.hyperparameter_values_64 as a{a}_hyperparameter_values_64,
+                    a{a}.accuracy as a{a}_accuracy,
+                    a{a}.f1_score as a{a}_f1_score,
+                    a{a}.precision as a{a}_precision,
+                    a{a}.recall as a{a}_recall,
+                    a{a}.neg_log_loss as a{a}_neg_log_loss,
+                    a{a}.roc_auc_score as a{a}_roc_auc_score'''.format(d=j, a=j + 1) for j in range(0, depth + 1)])
+                query += '''\nfrom mlb.datasets d0\njoin unique_algorithms a1 on d0.id = a1.input_dataset\n'''
+                for j in range(1, depth + 1):
+                    query += '''join mlb.datasets d{idx} on d{idx}.id = a{idx}.output_dataset\n'''.format(idx=j)
+                    query += '''join unique_algorithms a{} on d{}.id = a{}.input_dataset\n'''.format(j + 1, j, j + 1)
+                query += 'where d0."depth" = 0 and a{}.accuracy is not null;'.format(depth + 1)
+                print(query, end='\n\n\n')
+
+                con.execute(query)
+                con.execute('declare pip_curs CURSOR FOR SELECT * FROM pipelines')
+                chunk = 0
+                while True:
+                    dataset_samples = None
+                    hyperparam_samples = {}
+
+                    df = pd.read_sql('FETCH 100000 FROM pip_curs', con)
+                    if df.shape[0] == 0:
+                        break
+                    print('Chunk {}'.format(chunk))
+
+                    dataset_candidates = []
+                    hyperparam_candidates = []
+
+                    for d in range(depth + 1):
+                        algorithm = df.filter(regex='a{}_*'.format(d + 1)).rename(columns=lambda n: n[3:]) \
+                            .apply(lambda row: Algorithm(**row.to_dict(), input_dataset=0, output_dataset=None), axis=1)
+
+                        mf = df.filter(regex='d{}_*'.format(d))
+                        mf.insert(0, 'algorithm', algorithm.apply(lambda a: a.algorithm))
+                        mf.insert(1, 'depth', d)
+                        dataset_candidates.append(mf)
+
+                        hp = pd.DataFrame(data={'algorithm': algorithm.apply(lambda a: a.algorithm),
+                                                'depth': d,
+                                                'hp': algorithm.apply(lambda a: a.get_config_array())
+                                                })
+                        hyperparam_candidates.append(hp)
+
+                        classifier = algorithm.apply(lambda a: not (a.accuracy is None or np.isnan(a.accuracy)))
+                        if classifier.sum() == 0:
+                            continue
+
+                        performance = np.stack(algorithm[classifier].apply(lambda a: a.get_performance()).values)
+                        for ds_candidate in dataset_candidates:
+                            ds_sample = ds_candidate[classifier].copy()
+                            ds_sample['depth'] = d - ds_sample['depth']
+                            ds_sample = np.concatenate((ds_sample.to_numpy(), performance), axis=1)
+
+                            if dataset_samples is None:
+                                dataset_samples = ds_sample
+                            else:
+                                dataset_samples = np.concatenate((dataset_samples, ds_sample))
+
+                        for hp_candidate in hyperparam_candidates:
+                            hp_sample = hp_candidate[classifier].copy()
+                            hp_sample['depth'] = d - hp_sample['depth']
+
+                            for algo in hp_sample['algorithm'].unique():
+                                idx = hp_sample['algorithm'] == algo
+                                hp = np.concatenate((np.stack(
+                                    hp_sample[idx].apply(lambda row: np.insert(row['hp'], 0, row['depth']), axis=1)),
+                                                     performance[idx]), axis=1)
+
+                                if algo not in hyperparam_samples:
+                                    hyperparam_samples[algo] = hp
+                                else:
+                                    hyperparam_samples[algo] = np.concatenate((hyperparam_samples[algo], hp))
+
+                    with open('export_depth_{}.{}.pkl'.format(depth, chunk), 'wb') as f:
+                        pickle.dump((dataset_samples, hyperparam_samples), f)
+                    chunk += 1
+
+                con.execute('CLOSE  pip_curs;')
