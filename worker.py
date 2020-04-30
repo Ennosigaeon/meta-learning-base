@@ -190,7 +190,7 @@ class Worker(object):
         Last is_dataset_finished checks if a dataset has reached max pipeline depth. If a dataset has reached
         max pipeline depth, is_dataset_finished returns True.
         """
-        n_completed = self.db.get_algorithm_count(dataset_id=self.dataset.id)
+        n_completed = self.dataset.processed
 
         # Dataset has reached max pipeline depth
         if self.dataset.depth >= self.max_pipeline_depth:
