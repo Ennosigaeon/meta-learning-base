@@ -192,7 +192,7 @@ class GenericConfig(Config):
 class WorkerConfig(Config):
     timeout = {
         'help': 'Time in seconds to execute a single algorithm',
-        'default': 600,
+        'default': 180,
         'required': False
     }
     complete_pipelines = {
@@ -202,6 +202,6 @@ class WorkerConfig(Config):
     }
     complete_pipeline_samples = {
         'help': 'Number of samples of classifiers to use to obtain the final pipelines performance',
-        'default': 20,
+        'default': 10,
         'required': False
     }
