@@ -9,6 +9,7 @@ import random
 import sys
 from io import StringIO
 from operator import attrgetter
+from pathlib import Path
 
 import math
 import pandas as pd
@@ -80,7 +81,7 @@ class Core(object):
         self._abort = False
 
         LOGGER.info('Scanning cache dir. This may take some while...')
-        # TODO crashes if work_dir does not exist
+        Path(self.work_dir).mkdir(parents=True, exist_ok=True)
         self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
         self.cache_percentage = cache_percentage
 
@@ -163,14 +164,11 @@ class Core(object):
         def clean_cache():
             LOGGER.info('Cleaning cache. This may take some while...')
 
-            list_of_files = [os.path.join(self.work_dir, f) for f in os.listdir(self.work_dir)]
-            list_of_files = sorted(list_of_files, key=os.path.getatime)
-            n = int(len(list_of_files) / 2)
-            for idx in range(n):
-                os.remove(list_of_files[idx])
+            shutil.rmtree(self.work_dir)
+            Path(self.work_dir).mkdir(parents=True, exist_ok=True)
 
             self.cache_total, self.cache_used, free = shutil.disk_usage(self.work_dir)
-            LOGGER.info('Deleted {} files. Using {} of cache'.format(n, self.cache_used / self.cache_total))
+            LOGGER.info('Deleted local cache. Using {} of cache'.format(self.cache_used / self.cache_total))
 
         try:
             local_file = store_data(df, self.work_dir, name)

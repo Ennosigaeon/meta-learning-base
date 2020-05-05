@@ -33,6 +33,7 @@ def load_openml(dataset_conf: DatasetConfig) -> pd.DataFrame:
 
 
 def load_data(path: str, s3_config: str = None, s3_bucket: str = None, name: str = None) -> pd.DataFrame:
+    # TODO cache is never cleared if no new data is added but only this function is called
     if not os.path.isfile(path):
         if s3_config is None:
             raise FileNotFoundError(f'{path} does not exist')
