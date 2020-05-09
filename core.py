@@ -6,20 +6,22 @@ executing and orchestrating the main Core functionalities.
 import logging
 import os
 import random
+import re
+import shutil
+import signal
 import sys
+import time
+import uuid
 from io import StringIO
 from operator import attrgetter
 from pathlib import Path
+from typing import List
 
 import math
 import pandas as pd
-import shutil
-import signal
-import time
-import uuid
+import psutil
 from pympler import muppy, summary, refbrowser
 from tqdm import tqdm
-from typing import List
 
 from constants import RunStatus
 from data import store_data, upload_data
@@ -56,6 +58,7 @@ class Core(object):
             # Worker Conf
             complete_pipelines: bool = False,
             complete_pipeline_samples: int = 20,
+            affinity: bool = False,
 
             # S3 Conf
             service_account: str = None,
@@ -73,6 +76,7 @@ class Core(object):
         self.complete_pipelines = complete_pipelines
         self.complete_pipeline_samples = complete_pipeline_samples
         self.max_pipeline_depth = max_pipeline_depth
+        self.affinity = affinity
 
         self.s3_config: str = service_account
         self.s3_bucket: str = bucket
@@ -210,6 +214,17 @@ class Core(object):
 
         failure_counter = 0
 
+        # Count number of running workers
+        pids = set()
+        if self.affinity:
+            for p in psutil.process_iter():
+                if re.match('.*python\\d?', p.name()) and 'worker' in p.cmdline() and \
+                        len([arg for arg in p.cmdline() if arg.endswith('cli.py')]) > 0:
+                    if p.parent() is None or p.parent().pid not in pids:
+                        pids.add(p.pid)
+            core = {len(pids) - 1 % os.cpu_count()}
+            LOGGER.info('Setting affinity to {}'.format(core))
+
         while True:
             if self._abort:
                 LOGGER.info("Stopping processing due to user request")
@@ -256,6 +271,7 @@ class Core(object):
                                 complete_pipelines=self.complete_pipelines,
                                 complete_pipeline_samples=self.complete_pipeline_samples,
                                 max_pipeline_depth=self.max_pipeline_depth,
+                                affinity=core,
                                 verbose_metrics=self.verbose_metrics)
 
                 """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""

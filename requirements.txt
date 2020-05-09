@@ -5,6 +5,7 @@ google-cloud-storage==1.26.0
 numpy==1.16.*
 openml==0.10.*
 pandas==0.24.*
+psutil==5.6.*
 psycopg2==2.8.*
 pyarrow
 pymfe==0.1.*
