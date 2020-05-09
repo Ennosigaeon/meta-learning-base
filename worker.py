@@ -11,7 +11,7 @@ from datetime import datetime
 from sklearn.base import BaseEstimator, is_classifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import cross_val_predict
-from typing import Optional, Tuple, Dict, TYPE_CHECKING
+from typing import Optional, Tuple, Dict, TYPE_CHECKING, Set
 
 from constants import AlgorithmStatus
 from data import delete_data
@@ -54,6 +54,7 @@ class Worker(object):
                  timeout: int = None,
                  s3_config: str = None,
                  s3_bucket: str = None,
+                 affinity: Set[int] = None,
 
                  complete_pipelines: bool = False,
                  complete_pipeline_samples: int = 20,
@@ -64,6 +65,7 @@ class Worker(object):
         self.dataset = dataset
         self.core: Core = core
         self.timeout = timeout
+        self.affinity = affinity
 
         self.s3_config = s3_config
         self.s3_bucket = s3_bucket
@@ -266,8 +268,8 @@ class Worker(object):
         Transform the dataset and save the algorithm
         """
         try:
-            wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout, logger=self.subprocess_logger)(
-                self.transform_dataset)
+            wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout, affinity=self.affinity,
+                                               logger=self.subprocess_logger)(self.transform_dataset)
             instance = algorithm.instance(params.get_dictionary())
             res = wrapper(instance)
             if wrapper.exit_status is pynisher2.TimeoutException:

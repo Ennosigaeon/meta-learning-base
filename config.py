@@ -205,3 +205,8 @@ class WorkerConfig(Config):
         'default': 10,
         'required': False
     }
+    affinity = {
+        'help': 'Limits the worker to only a single CPU core',
+        'default': False,
+        'required': False
+    }
