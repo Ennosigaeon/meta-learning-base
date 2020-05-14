@@ -366,13 +366,13 @@ class MetaFeatures(object):
                        'nr_attr': df.shape[1],
                    }, False
 
-        # Extracting Missing Value Meta Features with AutoSklearn
+        # Extracting Missing Value Meta Features with AutoSklearn.
         nr_missing_values = NumberOfMissingValues()(X, y, categorical=True).value
         pct_missing_values = PercentageOfMissingValues()(X, y, categorical=True).value
         nr_inst_mv = NumberOfInstancesWithMissingValues()(X, y, categorical=True).value
         nr_attr_mv = NumberOfFeaturesWithMissingValues()(X, y, categorical=True).value
 
-        # Meta-Feature calculation does not work with missing data
+        # Meta-Feature calculation does not work with missing data.
         numeric = X.select_dtypes(include=['number']).columns
         if np.any(pd.isna(X)):
             n = X.shape[0]
@@ -382,11 +382,14 @@ class MetaFeatures(object):
                 nan = pd.isna(col)
                 if not nan.any():
                     continue
+                # Drop column if it contains of more nans then the max_nan_percentage.
                 elif nan.value_counts(normalize=True)[True] > max_nan_percentage:
                     X.drop(i, axis=1, inplace=True)
+                # Impute column if values are numeric.
                 elif i in numeric:
                     filler = np.random.normal(col.mean(), col.std(), n)
                     X[i] = col.combine_first(pd.Series(filler))
+                # Impute column if values are categorical.
                 else:
                     items = col.dropna().unique()
                     probability = col.value_counts(dropna=True, normalize=True)
@@ -403,6 +406,7 @@ class MetaFeatures(object):
                 if not (col != col.iloc[0]).any():
                     X.drop(i, inplace=True, axis=1)
 
+        # Mark dataset as skipped if X has no samples, no features or only constant values.
         if X.shape[0] == 0 or X.shape[1] == 0:
             LOGGER.info('X has no samples, no features or only constant values. Marking dataset as skipped.')
             return {

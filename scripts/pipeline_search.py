@@ -1,6 +1,12 @@
 import logging
+from datetime import datetime
 
 import sklearn
+from sklearn.base import is_classifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.model_selection import cross_val_predict
+from sklearn.model_selection import train_test_split
+import tpot
 from arff2pandas import a2p
 import pandas as pd
 import numpy as np
@@ -9,6 +15,7 @@ from config import DatasetConfig
 from data import load_openml
 from database import Database
 from metafeatures import MetaFeatures
+from utilities import logloss, multiclass_roc_auc_score
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -17,7 +24,7 @@ logging.basicConfig(level=logging.DEBUG)
 db = Database('postgres', 'postgres', 'postgres', 'usu4867!', '35.242.255.138', 5432)
 
 """Load new dataset from OpenML, CSV or ARFF"""
-config = DatasetConfig({'openml': 15, 'train_path': None})
+config = DatasetConfig({'openml': 1510, 'train_path': None})
 df = load_openml(config)
 # df = pd.read_csv('')
 # with open('amldata.arff') as f:
@@ -44,7 +51,7 @@ with engine.connect() as conn:
         leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean,
         var_importance_sd, one_nn_mean, one_nn_sd, best_node_mean, best_node_sd, linear_discr_mean, linear_discr_sd,
         naive_bayes_mean, naive_bayes_sd
-        FROM datasets ORDER BY id desc LIMIT 1000''', conn)  # LIMIT just for testing
+        FROM datasets ORDER BY id desc LIMIT 10''', conn)  # LIMIT just for testing
 
 id_vec = datasets['id']
 datasets = datasets.drop(columns=['id'])
@@ -58,67 +65,86 @@ for index, row in datasets.iterrows():
     dist_list.append(dist)
 
 distances = pd.Series(dist_list, name='distance')
+print(datetime.now())
 top_df = pd.concat([id_vec, datasets, distances], axis=1).sort_values(by='distance').head(10)
+print(datetime.now())
 
 """Get Dataset with most similar Meta-Features"""
 most_sim = top_df.iloc[0]['id']
 
 """Get Pipelines for Dataset from Database"""
-engine = db.engine
-with engine.connect() as conn:
-    select_statement = '''
-        WITH recursive pipelines
-                (AlgoID,
-                Algorithm,
-                InputData,
-                OutputData,
-                Depth)
-        AS (SELECT
-                id,
-                algorithm,
-                input_dataset,
-                output_dataset,
-                0
-                
-        FROM algorithms
-        WHERE input_dataset = {}
-        
-        UNION ALL
-        
-        SELECT
-                algorithms.id,
-                algorithms.algorithm,
-                algorithms.input_dataset,
-                algorithms.output_dataset,
-                pipelines.Depth + 1
-                
-        FROM algorithms
-            JOIN pipelines ON algorithms.input_dataset = pipelines.OutputData
-        )   
-        SELECT * 
-        FROM pipelines
-        ORDER BY Depth
-        '''.format(most_sim)
+# engine = db.engine
+# with engine.connect() as conn:
+#     select_statement = '''
+
+#         '''.format(most_sim)
 
 """Run Pipelines on new Dataset"""
+pipelines = pd.DataFrame(np.array([['p1', 2, '18214840000182150100001821463'],
+                                   ['p2', 5, '1821484.1821501.1821507'],
+                                   ['p3', 8, '1821484.1821501.1822276']]),
+                         columns=['bla1', 'bla2', 'path'])
+
+X_out, y_out = df.drop(class_column, axis=1), df[class_column]
+pipeline_res = pd.DataFrame(columns=['accuracy', 'precision', 'recall', 'f1_score', 'log_loss', 'roc_auc'])
+
+for index, row in pipelines.iterrows():
+    path = row['path'].split('0000')
+
+    for i in path:
+        algorithm = db.get_algorithm(i)
+        algorithm = algorithm.instance()
+
+        if is_classifier(algorithm):
+            resultlist = []
+
+            """Predict labels with n fold cross validation"""
+            y_pred = cross_val_predict(algorithm, X_out, y_out, cv=5)
+
+            """Calculate evaluation metrics"""
+            accuracy = accuracy_score(y_out, y_pred)
+            resultlist.append(accuracy)
+            precision = precision_score(y_out, y_pred, average='weighted')
+            resultlist.append(precision)
+            recall = recall_score(y_out, y_pred, average='weighted')
+            resultlist.append(recall)
+            f1 = f1_score(y_out, y_pred, average='weighted')
+            resultlist.append(f1)
+            log_loss = logloss(y_out, y_pred)
+            resultlist.append(log_loss)
+            roc_auc = multiclass_roc_auc_score(y_out, y_pred, average='weighted')
+            resultlist.append(roc_auc)
+
+            pipeline_res.loc[len(pipeline_res.index)] = resultlist
+
+        else:
+            """
+            If algorithm object has method fit_transform, call fit_transform on X, y. Else, first call fit on X, y,
+            then transform on X. Safe the transformed dataset in X
+            """
+            if hasattr(algorithm, 'fit_transform'):
+                X_out = algorithm.fit_transform(X_out, y_out)
+            else:
+                # noinspection PyUnresolvedReferences
+                X_out = algorithm.fit(X_out, y_out).transform(X_out)
+
+            X_out = pd.DataFrame(data=X_out, index=range(X_out.shape[0]), columns=range(X_out.shape[1]))
+
 
 """Find Pipelines for new Dataset with AutoML, TPOT, Random Search"""
-from sklearn.model_selection import train_test_split
-
-X_train, X_test, y_train, y_test = train_test_split(df, class_column, train_size=0.75, test_size=0.25)
+X, y = df.drop(class_column, axis=1), df[class_column]
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.75, test_size=0.25)
 
 """TPOT"""
-import tpot
-
 pipeline_optimizer = tpot.TPOTClassifier(generations=5, population_size=20, cv=5, random_state=42, verbosity=2)
 pipeline_optimizer.fit(X_train, y_train)
 print("Accuracy score", pipeline_optimizer.score(X_test, y_test))
 tpot.export('tpot_pipeline.py')
 
 """Auto-Sklearn"""
-from autosklearn import classification
+from autosklearn.classification import AutoSklearnClassifier
 
-automl = classification.AutoSklearnClassifier()
+automl = AutoSklearnClassifier()
 automl.fit(X_train, y_train)
 y_hat = automl.predict(X_test)
 print("Accuracy score", sklearn.metrics.accuracy_score(y_test, y_hat))
