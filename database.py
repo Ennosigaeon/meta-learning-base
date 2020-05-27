@@ -12,9 +12,11 @@ from ConfigSpace.configuration_space import Configuration
 from sklearn.base import BaseEstimator
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine, BigInteger
 from sqlalchemy.engine.url import URL
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
+from components.base import EstimatorComponent
 from constants import AlgorithmStatus, RunStatus
 from data import load_data
 from methods import ALGORITHMS
@@ -374,7 +376,7 @@ class Algorithm(Base):
     def default_config(self) -> Configuration:
         return self.cs.get_default_configuration()
 
-    def instance(self, params: dict = None) -> BaseEstimator:
+    def instance(self, params: dict = None) -> EstimatorComponent:
         if params is None:
             if self.hyperparameter_values is None:
                 params = self.random_config().get_dictionary()
@@ -474,6 +476,33 @@ class Database(object):
         if len(datasets) == 0:
             return None
         return datasets
+
+    @try_with_session(commit=True)
+    def select_dataset(self) -> Optional[Dataset]:
+        try:
+            rs = self.session.execute('''
+            UPDATE {table}
+            SET    status = '{running}' 
+            WHERE  id = (
+                SELECT id  FROM {table} WHERE  status = '{pending}'
+                ORDER BY depth LIMIT 1 FOR UPDATE SKIP LOCKED
+             )
+            RETURNING id;
+            '''.format(table=Dataset.__tablename__, running=RunStatus.RUNNING, pending=RunStatus.PENDING))
+
+        except OperationalError:
+            rs = self.session.execute('''
+                SELECT id  FROM {table} WHERE  status = '{pending}' ORDER BY depth LIMIT 1
+            '''.format(table=Dataset.__tablename__, pending=RunStatus.PENDING))
+
+        try:
+            id = next(rs)['id']
+            ds = self.get_dataset(id)
+            ds.status = RunStatus.RUNNING
+            ds.start_time = datetime.now()
+            return ds
+        except StopIteration:
+            return None
 
     @try_with_session()
     def get_datasets_by_hash(self, hashcode: str) -> List[Dataset]:

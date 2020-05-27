@@ -6,15 +6,19 @@ This project requires Python 3.6, Docker and docker-compose. It consists of thre
 - sklearn-components
 - pynisher
 
+```bash
+sudo apt-get install libatlas-base-dev libblas3 liblapack3 liblapack-dev libblas-dev gfortran
+sudo apt install python3-pip build-essential
+
 Download other projects and install them
 ```bash
 cd ..
 git clone https://gitlab.usu-research.ml/research/automl/sklearn-components.git
 sudo pip3 install -r sklearn-components/requirements.txt
-sudo pip3 install -e sklearn-components
+pip3 install -e sklearn-components
 
 git clone https://github.com/Ennosigaeon/pynisher.git
-sudo pip3 install -e pynisher
+pip3 install -e pynisher
 ```
 
 Install system-packages
@@ -30,7 +34,7 @@ pip3 install -r meta-learning-base/requirements.txt
 
 Configure virtual memory to prevent OOM killer
 ```bash
-vim /etc/sysctl.conf
+sudo vim /etc/sysctl.conf
 
 vm.overcommit_memory=2
 vm.overcommit_ratio=100

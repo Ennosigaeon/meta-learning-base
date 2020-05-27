@@ -31,6 +31,7 @@ def _work(args):
     core = _get_core(args)
 
     core.work(
+        use_defaults=True,
         choose_randomly=False,
         wait=False
     )
