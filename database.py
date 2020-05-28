@@ -16,7 +16,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-from components.base import EstimatorComponent
+from automl.components.base import EstimatorComponent
 from constants import AlgorithmStatus, RunStatus
 from data import load_data
 from methods import ALGORITHMS
