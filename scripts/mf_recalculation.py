@@ -14,15 +14,13 @@ warnings.filterwarnings("ignore", message="divide by zero encountered")
 warnings.filterwarnings("ignore", message="invalid value encountered")
 
 # db = Database('sqlite', 'ml-base.db')
-db = Database('postgres', 'postgres', 'postgres', 'usu4867!', '35.242.255.138', 5432)
+db = Database('postgres', 'default', 'postgres', 'postgres', 'localhost', 5432)
 
 engine = db.engine
 with engine.connect() as conn:
     select_statement = '''
         select * from datasets
-        WHERE (nr_class = 'NaN' or nr_missing_values = 'NaN' or pct_missing_values = 'NaN' or nr_inst_mv = 'NaN' or pct_inst_mv = 'NaN' or nr_attr_mv = 'NaN' or pct_attr_mv = 'NaN' or nr_outliers = 'NaN' or skewness_mean = 'NaN' or skewness_sd = 'NaN' or kurtosis_mean = 'NaN' or kurtosis_sd = 'NaN' or cor_mean = 'NaN' or cor_sd = 'NaN' or cov_mean = 'NaN' or cov_sd = 'NaN' or sparsity_mean = 'NaN' or sparsity_sd = 'NaN' or var_mean = 'NaN' or var_sd = 'NaN' or class_prob_mean = 'NaN' or class_prob_std = 'NaN' or class_ent = 'NaN' or attr_ent_mean = 'NaN' or attr_ent_sd = 'NaN' or mut_inf_mean = 'NaN' or mut_inf_sd = 'NaN' or eq_num_attr = 'NaN' or ns_ratio = 'NaN' or nodes = 'NaN' or leaves = 'NaN' or leaves_branch_mean = 'NaN' or leaves_branch_sd = 'NaN' or nodes_per_attr = 'NaN' or leaves_per_class_mean = 'NaN' or leaves_per_class_sd = 'NaN' or var_importance_mean = 'NaN' or var_importance_sd = 'NaN' or one_nn_mean = 'NaN' or one_nn_sd = 'NaN' or best_node_mean = 'NaN' or best_node_sd = 'NaN' or linear_discr_mean = 'NaN' or linear_discr_sd = 'NaN' or naive_bayes_mean = 'NaN' or naive_bayes_sd = 'NaN' or
-            nr_inst IS NULL or nr_attr IS NULL or nr_class IS NULL or nr_missing_values IS NULL or pct_missing_values IS NULL or nr_inst_mv IS NULL or pct_inst_mv IS NULL or nr_attr_mv IS NULL or pct_attr_mv IS NULL or nr_outliers IS NULL or skewness_mean IS NULL or skewness_sd IS NULL or kurtosis_mean IS NULL or kurtosis_sd IS NULL or cor_mean IS NULL or cor_sd IS NULL or cov_mean IS NULL or cov_sd IS NULL or sparsity_mean IS NULL or sparsity_sd IS NULL or var_mean IS NULL or var_sd IS NULL or class_prob_mean IS NULL or class_prob_std IS NULL or class_ent IS NULL or attr_ent_mean IS NULL or attr_ent_sd IS NULL or mut_inf_mean IS NULL or mut_inf_sd IS NULL or eq_num_attr IS NULL or ns_ratio IS NULL or nodes IS NULL or leaves IS NULL or leaves_branch_mean IS NULL or leaves_branch_sd IS NULL or nodes_per_attr IS NULL or leaves_per_class_mean IS NULL or leaves_per_class_sd IS NULL or var_importance_mean IS NULL or var_importance_sd IS NULL or one_nn_mean IS NULL or one_nn_sd IS NULL or best_node_mean IS NULL or best_node_sd IS NULL or linear_discr_mean IS NULL or linear_discr_sd IS NULL or naive_bayes_mean IS NULL or naive_bayes_sd IS null)
-            and status != 'skipped' and nr_inst != 0
+        WHERE nr_cat is null
         order by id desc;
         '''
 
@@ -47,6 +45,8 @@ with engine.connect() as conn:
                     UPDATE datasets SET 
                         nr_inst=0,
                         nr_attr=0,
+                        nr_num=0,
+                        nr_cat=0,
                         nr_class='NaN',
                         nr_missing_values='NaN',
                         pct_missing_values='NaN',
@@ -119,6 +119,8 @@ with engine.connect() as conn:
                 UPDATE datasets SET 
                     nr_inst={nr_inst},
                     nr_attr={nr_attr},
+                    nr_num={nr_num},
+                    nr_cat={nr_cat},
                     nr_class={nr_class},
                     nr_missing_values={nr_missing_values},
                     pct_missing_values={pct_missing_values},

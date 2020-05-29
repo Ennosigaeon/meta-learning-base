@@ -99,6 +99,8 @@ class Dataset(Base):
     """
     nr_inst = Column(Numeric)
     nr_attr = Column(Numeric)
+    nr_num = Column(Numeric)
+    nr_cat = Column(Numeric)
     nr_class = Column(Numeric)
     nr_missing_values = Column(Numeric)
     pct_missing_values = Column(Numeric)
@@ -161,9 +163,9 @@ class Dataset(Base):
     def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
                  start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 5,
                  depth: int = 0, hashcode: str = None,
-                 nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
-                 kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
-                 sparsity_mean=None, sparsity_sd=None,
+                 nr_inst=None, nr_attr=None, nr_num=None, nr_cat=None, nr_class=None, nr_outliers=None,
+                 skewness_mean=None, skewness_sd=None, kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None,
+                 cov_mean=None, cov_sd=None, sparsity_mean=None, sparsity_sd=None,
                  var_mean=None, var_sd=None, class_ent=None, attr_ent_mean=None, attr_ent_sd=None, mut_inf_mean=None,
                  mut_inf_sd=None, eq_num_attr=None, ns_ratio=None, nodes=None, leaves=None,
                  leaves_branch_mean=None, leaves_branch_sd=None, nodes_per_attr=None, leaves_per_class_mean=None,
@@ -186,6 +188,8 @@ class Dataset(Base):
 
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
+        self.nr_num = nr_num
+        self.nr_cat = nr_cat
         self.nr_class = nr_class
         self.nr_missing_values = nr_missing_values
         self.pct_missing_values = pct_missing_values
@@ -241,7 +245,7 @@ class Dataset(Base):
         return "<{}: {} classes, {} features, {} rows>".format(self.name, self.nr_class, self.nr_attr, self.nr_inst)
 
     def get_mf(self):
-        return [self.nr_inst, self.nr_attr, self.nr_class, self.nr_missing_values, self.pct_missing_values,
+        return [self.nr_inst, self.nr_attr, self.nr_num, self.nr_cat, self.nr_class, self.nr_missing_values, self.pct_missing_values,
                 self.nr_inst_mv, self.pct_inst_mv, self.nr_attr_mv, self.pct_attr_mv, self.nr_outliers,
                 self.skewness_mean, self.skewness_sd, self.kurtosis_mean, self.kurtosis_sd, self.cor_mean, self.cor_sd,
                 self.cov_mean, self.cov_sd, self.sparsity_mean, self.sparsity_sd, self.var_mean, self.var_sd,

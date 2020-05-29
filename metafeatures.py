@@ -415,21 +415,22 @@ class MetaFeatures(object):
                    }, False
 
         """
-       Selects Meta Features and extracts them
-       """
-        mfe = MFE(features=(['nr_inst', 'nr_attr', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis', 'cor', 'cov',
-                             'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
-                             'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
-                             'var_importance', 'one_nn', 'best_node', 'linear_discr',
-                             'naive_bayes', 'leaves_per_class']))
+        Selects Meta Features and extracts them
+        """
+        mfe = MFE(features=['nr_inst', 'nr_attr', 'nr_num', 'nr_cat', 'nr_class', 'nr_outliers', 'skewness', 'kurtosis',
+                            'cor', 'cov', 'sparsity', 'var', 'class_ent', 'attr_ent', 'mut_inf',
+                            'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
+                            'var_importance', 'leaves_per_class'])
         mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
-        f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
+        f_name, f_value, f_time = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
         """
         Mapping values to Meta Feature variables
         """
         nr_inst = int(f_value[f_name.index('nr_inst')])
         nr_attr = int(f_value[f_name.index('nr_attr')])
+        nr_num = int(f_value[f_name.index('nr_num')])
+        nr_cat = int(f_value[f_name.index('nr_cat')])
         nr_class = int(f_value[f_name.index('nr_class')])
         nr_outliers = int(f_value[f_name.index('nr_outliers')])
         class_ent = float(f_value[f_name.index('class_ent')])
@@ -481,17 +482,17 @@ class MetaFeatures(object):
         var_importance_mean = get_value('var_importance.mean')
         var_importance_sd = get_value('var_importance.sd') if nr_attr > 1 else 0
 
-        one_nn_mean = get_value('one_nn.mean')
-        one_nn_sd = get_value('one_nn.sd')
+        one_nn_mean = 0
+        one_nn_sd = 0
 
-        best_node_mean = get_value('best_node.mean')
-        best_node_sd = get_value('best_node.sd')
+        best_node_mean = 0
+        best_node_sd = 0
 
-        linear_discr_mean = get_value('linear_discr.mean')
-        linear_discr_sd = get_value('linear_discr.sd')
+        linear_discr_mean = 0
+        linear_discr_sd = 0
 
-        naive_bayes_mean = get_value('naive_bayes.mean')
-        naive_bayes_sd = get_value('naive_bayes.sd')
+        naive_bayes_mean = 0
+        naive_bayes_sd = 0
 
         # ##########################################################################
         # #  Extracting Meta Features with AutoSklearn  ############################
@@ -512,6 +513,8 @@ class MetaFeatures(object):
         return {
                    'nr_inst': nr_inst,
                    'nr_attr': nr_attr,
+                   'nr_num': nr_num,
+                   'nr_cat': nr_cat,
                    'nr_class': nr_class,
                    'nr_missing_values': nr_missing_values,
                    'pct_missing_values': pct_missing_values,
