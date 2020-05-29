@@ -422,7 +422,7 @@ class MetaFeatures(object):
                             'eq_num_attr', 'ns_ratio', 'nodes', 'leaves', 'leaves_branch', 'nodes_per_attr',
                             'var_importance', 'leaves_per_class'])
         mfe.fit(X.to_numpy(), y.to_numpy(), transform_cat=True)
-        f_name, f_value, f_time = mfe.extract(cat_cols='auto', suppress_warnings=True)
+        f_name, f_value = mfe.extract(cat_cols='auto', suppress_warnings=True)
 
         """
         Mapping values to Meta Feature variables
