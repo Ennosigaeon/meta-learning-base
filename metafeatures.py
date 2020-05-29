@@ -298,7 +298,7 @@ class ClassProbabilitySTD(MetaFeature):
 
 class MetaFeatures(object):
 
-    def __init__(self, mf_timeout: int = 600, mf_memory: int = 6144):
+    def __init__(self, mf_timeout: int = 30, mf_memory: int = 2048):
         self.mf_timeout = mf_timeout
         self.mf_memory = mf_memory
         self.subprocess_logger = logging.getLogger('mlb:mf')
