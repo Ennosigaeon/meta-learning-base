@@ -51,7 +51,7 @@ class Core(object):
             # Generic Conf
             work_dir: str = None,
             timeout: int = None,
-            cache_percentage: float = 0.9,
+            cache_percentage: float = 0.99,
             dataset_budget: int = None,
             max_pipeline_depth: int = 5,
 
@@ -167,6 +167,8 @@ class Core(object):
     def _cache_locally(self, df: pd.DataFrame, name: str) -> str:
         def clean_cache():
             LOGGER.info('Cleaning cache. This may take some while...')
+            # For complete local execution do not clean cache!
+            exit(-1)
 
             shutil.rmtree(self.work_dir)
             Path(self.work_dir).mkdir(parents=True, exist_ok=True)
