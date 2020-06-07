@@ -24,7 +24,7 @@ from pympler import muppy, summary, refbrowser
 from tqdm import tqdm
 
 from constants import RunStatus
-from data import store_data, upload_data
+from data import store_data, upload_data, delete_data
 from database import Database, Dataset
 from metafeatures import MetaFeatures
 from utilities import hash_file
@@ -284,6 +284,7 @@ class Core(object):
                     if use_defaults:
                         worker.run_default()
                         self.db.mark_dataset_complete(ds.id)
+                        delete_data(ds.train_path)
                         break
 
                     success = worker.run_algorithm()
