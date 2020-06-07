@@ -489,14 +489,14 @@ class Database(object):
             SET    status = '{running}' 
             WHERE  id = (
                 SELECT id  FROM {table} WHERE  status = '{pending}'
-                ORDER BY depth LIMIT 1 FOR UPDATE SKIP LOCKED
+                ORDER BY depth DESC LIMIT 1 FOR UPDATE SKIP LOCKED
              )
             RETURNING id;
             '''.format(table=Dataset.__tablename__, running=RunStatus.RUNNING, pending=RunStatus.PENDING))
 
         except OperationalError:
             rs = self.session.execute('''
-                SELECT id  FROM {table} WHERE  status = '{pending}' ORDER BY depth LIMIT 1
+                SELECT id  FROM {table} WHERE  status = '{pending}' ORDER BY depth DESC LIMIT 1
             '''.format(table=Dataset.__tablename__, pending=RunStatus.PENDING))
 
         try:
