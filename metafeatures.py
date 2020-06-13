@@ -95,12 +95,12 @@ class MetaFeatures(object):
 
         # Meta-Feature calculation does not work with missing data.
         numeric = X.select_dtypes(include=['number']).columns
-        if np.any(pd.isna(X)):
+        if np.any(missing):
             n = X.shape[0]
 
             for i in X.columns:
                 col = X[i]
-                nan = pd.isna(col)
+                nan = missing[i]
                 if not nan.any():
                     continue
                 # Drop column if it contains of more nans then the max_nan_percentage.
