@@ -123,6 +123,7 @@ class Core(object):
             df_old = ds.load(self.s3_config, self.s3_bucket)
             if df.equals(df_old):
                 LOGGER.info('New dataset equals dataset {} and is not stored in the DB.'.format(ds.id))
+                os.remove(local_file)
                 return ds
             del df_old
 
@@ -149,6 +150,7 @@ class Core(object):
         if not success:
             LOGGER.info('Meta-feature extraction failed. Marking this dataset as \'skipped\'')
             mf['status'] = RunStatus.SKIPPED
+            os.remove(local_file)
 
         """Saves input dataset and calculated meta-features to db"""
         if budget is None:
