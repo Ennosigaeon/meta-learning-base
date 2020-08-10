@@ -69,7 +69,7 @@ def store_data(df: pd.DataFrame, work_dir: str, name: str) -> str:
     df.columns = df.columns.astype(str)
 
     # Save dataframe as parquet-file to that path
-    df.to_parquet(path)
+    df.to_parquet(path, index=False)
 
     return path
 

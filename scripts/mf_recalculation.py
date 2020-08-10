@@ -35,8 +35,7 @@ with engine.connect() as conn:
         try:
             # df = load_data('data/' + name + '.parquet')
             local_file = '../data/' + name + '.parquet'
-            df = load_data(local_file, s3_config='../assets/limbo-233520-a283e9f868c1.json',
-                           s3_bucket='usu-mlb', name=name)
+            df = load_data(local_file, name=name)
 
             mf, success = MetaFeatures().calculate(df=df, class_column=class_column)
             if mf['nr_inst'] == 0 or mf['nr_attr'] == 0:
@@ -169,11 +168,8 @@ with engine.connect() as conn:
                     naive_bayes_sd={naive_bayes_sd}
                 WHERE id={id};
                 '''.format(**mf, id=id)
-            # print(update_statement)
 
             print('Updating')
             conn.execute(update_statement)
-
-            os.remove(local_file)
         except OSError as ex:
             print(ex)

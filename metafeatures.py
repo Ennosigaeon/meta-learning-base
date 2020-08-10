@@ -150,6 +150,7 @@ class MetaFeatures(object):
 
         if N.shape[1] > 1:
             cor = MFEStatistical.ft_cor(N, abs_corr_mat=precomp_statistical['abs_corr_mat'])
+            cor = cor[~np.isnan(cor)]
             cov = MFEStatistical.ft_cov(N, cov_mat=precomp_statistical['cov_mat'])
         else:
             cor = np.ones(1)
