@@ -9,7 +9,6 @@ from typing import Optional, List
 import numpy as np
 import pandas as pd
 from ConfigSpace.configuration_space import Configuration
-from sklearn.base import BaseEstimator
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine, BigInteger
 from sqlalchemy.engine.url import URL
 from sqlalchemy.exc import OperationalError
@@ -245,7 +244,8 @@ class Dataset(Base):
         return "<{}: {} classes, {} features, {} rows>".format(self.name, self.nr_class, self.nr_attr, self.nr_inst)
 
     def get_mf(self):
-        return [self.nr_inst, self.nr_attr, self.nr_num, self.nr_cat, self.nr_class, self.nr_missing_values, self.pct_missing_values,
+        return [self.nr_inst, self.nr_attr, self.nr_num, self.nr_cat, self.nr_class, self.nr_missing_values,
+                self.pct_missing_values,
                 self.nr_inst_mv, self.pct_inst_mv, self.nr_attr_mv, self.pct_attr_mv, self.nr_outliers,
                 self.skewness_mean, self.skewness_sd, self.kurtosis_mean, self.kurtosis_sd, self.cor_mean, self.cor_sd,
                 self.cov_mean, self.cov_sd, self.sparsity_mean, self.sparsity_sd, self.var_mean, self.var_sd,
@@ -623,33 +623,86 @@ class Database(object):
         else:
             raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))
 
-    def export_db(self, max_depth: int = 4, algorithm: bool = True):
+    def export_pipelines(self, max_depth: int = 4, schema: str = 'd1464', base_dir: str = 'assets/exports',
+                         cleanup: bool = True):
         with self.engine.connect() as con:
-            con.execute('SET search_path TO mlb;')
+            con.execute('SET search_path TO {};'.format(schema))
             con.execute('SET work_mem TO "2000MB";')
+
+            # Legacy clean-up
+            if cleanup:
+                # Remove obsolete algorithms
+                con.execute('''
+            delete from algorithms where id not in (
+                select a.id from algorithms a
+                join datasets d on a.input_dataset = d.id
+                where a.start_time >= d.start_time and a.end_time <= d.end_time
+            );''')
+                # Mark algorithms as errored that did not modify dataset
+                con.execute('''
+            update algorithms
+            set status = 'errored', accuracy = 0, f1_score = 0, "precision" = 0, recall = 0, roc_auc_score = 0, neg_log_loss = 100
+            where output_dataset = input_dataset;''')
+                # Remove dataset duplicates
+                con.execute('''
+            update algorithms a
+            set output_dataset = sub.id
+            from (
+                select id, unnest(replacement) as replacement from (
+                    select min(id) as id, count(*) as count, array_agg(id) as replacement
+                    from datasets d
+                    where status != 'skipped' and nr_inst != 0
+                    group by nr_inst, nr_attr, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd, one_nn_mean, one_nn_sd, best_node_mean, best_node_sd, linear_discr_mean, linear_discr_sd, naive_bayes_mean, naive_bayes_sd
+                ) s where count > 1
+            ) as sub
+            where a.output_dataset = sub.replacement and sub.id != sub.replacement;
+            update algorithms a
+            set input_dataset = sub.id
+            from (
+                select id, unnest(replacement) as replacement from (
+                    select min(id) as id, count(*) as count, array_agg(id) as replacement
+                    from datasets d
+                    where status != 'skipped' and nr_inst != 0
+                    group by nr_inst, nr_attr, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd, one_nn_mean, one_nn_sd, best_node_mean, best_node_sd, linear_discr_mean, linear_discr_sd, naive_bayes_mean, naive_bayes_sd
+                ) s where count > 1
+            ) as sub
+            where a.input_dataset = sub.replacement and sub.id != sub.replacement;
+            delete from datasets where id in (
+              select replacement from (
+                select id, unnest(replacement) as replacement from (
+                  select min(id) as id, count(*) as count, array_agg(id) as replacement
+                    from datasets d
+                    where status != 'skipped' and nr_inst != 0
+                    group by nr_inst, nr_attr, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd, one_nn_mean, one_nn_sd, best_node_mean, best_node_sd, linear_discr_mean, linear_discr_sd, naive_bayes_mean, naive_bayes_sd
+                  ) s where count > 1
+                ) s where replacement != id
+            );''')
 
             con.execute('''
             create materialized view if not exists unique_algorithms as
-            select MIN(id) as id, COUNT(id) as count, algorithm, hyperparameter_values_64, input_dataset, output_dataset,
+            select MIN(id) as id, COUNT(id) as count, status, algorithm, hyperparameter_values_64, input_dataset, output_dataset,
             AVG(accuracy) as accuracy, AVG(f1_score) as f1_score, AVG("precision") as "precision", AVG(recall) as recall, AVG(neg_log_loss) as neg_log_loss, AVG(roc_auc_score) as roc_auc_score
-            from mlb.algorithms a
-            group by algorithm, hyperparameter_values_64, input_dataset, output_dataset
+            from algorithms a
+            group by algorithm, status, hyperparameter_values_64, input_dataset, output_dataset;
             ''')
+            con.execute('create materialized view if not exists unique_datasets as select * from datasets d;')
 
-            for depth in range(2, max_depth):
+            for depth in range(0, max_depth):
                 con.execute('drop MATERIALIZED view if exists pipelines;')
 
                 query = '''create materialized view pipelines as select'''
                 query += ','.join(['''
                     d{d}.nr_inst as d{d}_nr_inst,
                     d{d}.nr_attr as d{d}_nr_attr,
+                    d{d}.nr_num / d{d}.nr_attr as d{d}_nr_num,
+                    d{d}.nr_cat / d{d}.nr_attr as d{d}_nr_cat,
                     d{d}.nr_class as d{d}_nr_class,
                     d{d}.nr_missing_values as d{d}_nr_missing_values,
                     d{d}.pct_missing_values as d{d}_pct_missing_values,
                     d{d}.nr_inst_mv as d{d}_nr_inst_mv,
-                    d{d}.pct_inst_mv as d{d}_pct_inst_mv,
+                    d{d}.pct_inst_mv / 100 as d{d}_pct_inst_mv,
                     d{d}.nr_attr_mv as d{d}_nr_attr_mv,
-                    d{d}.pct_attr_mv as d{d}_pct_attr_mv,
+                    d{d}.pct_attr_mv / 100 as d{d}_pct_attr_mv,
                     d{d}.nr_outliers as d{d}_nr_outliers,
                     d{d}.skewness_mean as d{d}_skewness_mean,
                     d{d}.skewness_sd as d{d}_skewness_sd,
@@ -681,14 +734,6 @@ class Database(object):
                     d{d}.leaves_per_class_sd as d{d}_leaves_per_class_sd,
                     d{d}.var_importance_mean as d{d}_var_importance_mean,
                     d{d}.var_importance_sd as d{d}_var_importance_sd,
-                    d{d}.one_nn_mean as d{d}_one_nn_mean,
-                    d{d}.one_nn_sd as d{d}_one_nn_sd,
-                    d{d}.best_node_mean as d{d}_best_node_mean,
-                    d{d}.best_node_sd as d{d}_best_node_sd,
-                    d{d}.linear_discr_mean as d{d}_linear_discr_mean,
-                    d{d}.linear_discr_sd as d{d}_linear_discr_sd,
-                    d{d}.naive_bayes_mean as d{d}_naive_bayes_mean,
-                    d{d}.naive_bayes_sd as d{d}_naive_bayes_sd,
                     a{a}.algorithm as a{a}_algorithm,
                     a{a}.hyperparameter_values_64 as a{a}_hyperparameter_values_64,
                     a{a}.accuracy as a{a}_accuracy,
@@ -696,12 +741,17 @@ class Database(object):
                     a{a}.precision as a{a}_precision,
                     a{a}.recall as a{a}_recall,
                     a{a}.neg_log_loss as a{a}_neg_log_loss,
-                    a{a}.roc_auc_score as a{a}_roc_auc_score'''.format(d=j, a=j + 1) for j in range(0, depth + 1)])
-                query += '''\nfrom mlb.datasets d0\njoin unique_algorithms a1 on d0.id = a1.input_dataset\n'''
-                for j in range(1, depth + 1):
-                    query += '''join mlb.datasets d{idx} on d{idx}.id = a{idx}.output_dataset\n'''.format(idx=j)
-                    query += '''join unique_algorithms a{} on d{}.id = a{}.input_dataset\n'''.format(j + 1, j, j + 1)
-                query += 'where d0."depth" = 0 and a{}.accuracy is not null;'.format(depth + 1)
+                    a{a}.roc_auc_score as a{a}_roc_auc_score\n'''.format(d=j, a=j + 1) for j in range(0, depth + 1)])
+                for j in range(0, depth + 1):
+                    if j == 0:
+                        query += 'from unique_datasets d{idx}\n'.format(idx=j)
+                    else:
+                        query += '''join unique_datasets d{idx} on d{idx}.id = a{idx}.output_dataset\n'''.format(idx=j)
+
+                    cond = '''.status = 'complete' ''' if j < depth else '.accuracy is not null'
+                    query += '''join unique_algorithms a{a} on d{d}.id = a{a}.input_dataset and a{a}{cond}\n'''.format(
+                        a=j + 1, d=j, cond=cond)
+                query += 'where d0."depth" = 0;'.format(depth + 1)
                 print(query, end='\n\n\n')
 
                 con.execute(query)
@@ -709,7 +759,6 @@ class Database(object):
                 chunk = 0
                 while True:
                     dataset_samples = None
-                    hyperparam_samples = {}
 
                     df = pd.read_sql('FETCH 100000 FROM pip_curs', con)
                     if df.shape[0] == 0:
@@ -717,7 +766,6 @@ class Database(object):
                     print('Chunk {}'.format(chunk))
 
                     dataset_candidates = []
-                    hyperparam_candidates = []
 
                     for d in range(depth + 1):
                         algorithm = df.filter(regex='a{}_*'.format(d + 1)).rename(columns=lambda n: n[3:]) \
@@ -727,12 +775,6 @@ class Database(object):
                         mf.insert(0, 'algorithm', algorithm.apply(lambda a: a.algorithm))
                         mf.insert(1, 'depth', d)
                         dataset_candidates.append(mf)
-
-                        hp = pd.DataFrame(data={'algorithm': algorithm.apply(lambda a: a.algorithm),
-                                                'depth': d,
-                                                'hp': algorithm.apply(lambda a: a.get_config_array())
-                                                })
-                        hyperparam_candidates.append(hp)
 
                         classifier = algorithm.apply(lambda a: not (a.accuracy is None or np.isnan(a.accuracy)))
                         if classifier.sum() == 0:
@@ -749,23 +791,8 @@ class Database(object):
                             else:
                                 dataset_samples = np.concatenate((dataset_samples, ds_sample))
 
-                        for hp_candidate in hyperparam_candidates:
-                            hp_sample = hp_candidate[classifier].copy()
-                            hp_sample['depth'] = d - hp_sample['depth']
-
-                            for algo in hp_sample['algorithm'].unique():
-                                idx = hp_sample['algorithm'] == algo
-                                hp = np.concatenate((np.stack(
-                                    hp_sample[idx].apply(lambda row: np.insert(row['hp'], 0, row['depth']), axis=1)),
-                                                     performance[idx]), axis=1)
-
-                                if algo not in hyperparam_samples:
-                                    hyperparam_samples[algo] = hp
-                                else:
-                                    hyperparam_samples[algo] = np.concatenate((hyperparam_samples[algo], hp))
-
-                    with open('export_depth_{}.{}.pkl'.format(depth, chunk), 'wb') as f:
-                        pickle.dump((dataset_samples, hyperparam_samples), f)
+                    with open('{}/export_{}_depth_{}.{}.pkl'.format(base_dir, schema, depth, chunk), 'wb') as f:
+                        pickle.dump(dataset_samples, f)
                     chunk += 1
 
                 con.execute('CLOSE  pip_curs;')

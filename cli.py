@@ -57,10 +57,10 @@ def _enter_data(args):
     return dataset.id
 
 
-def _export_db(args):
+def _export_pipelines(args):
     core = _get_core(args)
-    core.export_db()
-    print('Export db')
+    core.export_pipelines()
+    print('Export pipelines')
 
 
 def _get_parser():
@@ -118,15 +118,15 @@ def _get_parser():
     worker.add_argument('--datasets', help='Only train on datasets with these ids', nargs='+')
     worker.add_argument('--total-time', help='Number of seconds to run worker', type=int)
 
-    export_db_parents = [
+    export_pipelines_parents = [
         logging_args,
         log_args,
         sql_args,
         generic_args
     ]
-    export_db = subparsers.add_parser('export_db', parents=export_db_parents,
+    export_pipelines = subparsers.add_parser('export_pipelines', parents=export_pipelines_parents,
                                       help='Export all data sets and algorithms to a DataFrame')
-    export_db.set_defaults(action=_export_db)
+    export_pipelines.set_defaults(action=_export_pipelines)
 
     return parser
 

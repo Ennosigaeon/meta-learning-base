@@ -327,5 +327,5 @@ class Core(object):
             finally:
                 del worker
 
-    def export_db(self):
-        return self.db.export_db()
+    def export_pipelines(self):
+        return self.db.export_pipelines()
