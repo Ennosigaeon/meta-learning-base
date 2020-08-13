@@ -63,6 +63,12 @@ def _export_pipelines(args):
     print('Export pipelines')
 
 
+def _export_datasets(args):
+    core = _get_core(args)
+    core.export_datasets()
+    print('Export datasets')
+
+
 def _get_parser():
     logging_args = argparse.ArgumentParser(add_help=False)
     logging_args.add_argument('-v', '--verbose', action='count', default=0)
@@ -118,15 +124,20 @@ def _get_parser():
     worker.add_argument('--datasets', help='Only train on datasets with these ids', nargs='+')
     worker.add_argument('--total-time', help='Number of seconds to run worker', type=int)
 
-    export_pipelines_parents = [
+    # Export Data
+    export_data = [
         logging_args,
         log_args,
         sql_args,
         generic_args
     ]
-    export_pipelines = subparsers.add_parser('export_pipelines', parents=export_pipelines_parents,
-                                      help='Export all data sets and algorithms to a DataFrame')
+    export_pipelines = subparsers.add_parser('export_pipelines', parents=export_data,
+                                             help='Export all data sets and algorithms to a DataFrame')
     export_pipelines.set_defaults(action=_export_pipelines)
+
+    export_datasets = subparsers.add_parser('export_datasets', parents=export_data,
+                                            help='Export all data sets and algorithms to a DataFrame')
+    export_datasets.set_defaults(action=_export_datasets)
 
     return parser
 

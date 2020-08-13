@@ -329,3 +329,7 @@ class Core(object):
 
     def export_pipelines(self):
         return self.db.export_pipelines()
+
+    def export_datasets(self):
+        return self.db.export_datasets()
+

@@ -435,6 +435,9 @@ class Database(object):
         # create ORM objects for the tables
         self._define_tables()
 
+        self.schemas = ['d1461', 'd1464', 'd1486', 'd1489', 'd1590', 'd23512', 'd23517', 'd3', 'd31', 'd40668',
+                        'd40685', 'd40975', 'd40981', 'd40984', 'd41027', 'd41143', 'd41146', 'd54']
+
     def _define_tables(self) -> None:
         """
         Define the SQLAlchemy ORM class for each table in the ModelHub database.
@@ -623,28 +626,21 @@ class Database(object):
         else:
             raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))
 
-    def export_pipelines(self, max_depth: int = 4, schema: str = 'd1464', base_dir: str = 'assets/exports',
-                         cleanup: bool = True):
-        with self.engine.connect() as con:
-            con.execute('SET search_path TO {};'.format(schema))
-            con.execute('SET work_mem TO "2000MB";')
-
-            # Legacy clean-up
-            if cleanup:
-                # Remove obsolete algorithms
-                con.execute('''
+    def _cleanup(self, con):
+        # Remove obsolete algorithms
+        con.execute('''
             delete from algorithms where id not in (
                 select a.id from algorithms a
                 join datasets d on a.input_dataset = d.id
                 where a.start_time >= d.start_time and a.end_time <= d.end_time
             );''')
-                # Mark algorithms as errored that did not modify dataset
-                con.execute('''
+        # Mark algorithms as errored that did not modify dataset
+        con.execute('''
             update algorithms
             set status = 'errored', accuracy = 0, f1_score = 0, "precision" = 0, recall = 0, roc_auc_score = 0, neg_log_loss = 100
-            where output_dataset = input_dataset;''')
-                # Remove dataset duplicates
-                con.execute('''
+            where output_dataset = input_dataset and status != 'errored';''')
+        # Remove dataset duplicates
+        con.execute('''
             update algorithms a
             set output_dataset = sub.id
             from (
@@ -677,6 +673,16 @@ class Database(object):
                   ) s where count > 1
                 ) s where replacement != id
             );''')
+
+    def export_pipelines(self, max_depth: int = 4, schema: str = 'd1464', base_dir: str = 'assets/exports',
+                         cleanup: bool = False):
+        with self.engine.connect() as con:
+            con.execute('SET search_path TO {};'.format(schema))
+            con.execute('SET work_mem TO "2000MB";')
+
+            # Legacy clean-up
+            if cleanup:
+                self._cleanup(con)
 
             con.execute('''
             create materialized view if not exists unique_algorithms as
@@ -796,3 +802,82 @@ class Database(object):
                     chunk += 1
 
                 con.execute('CLOSE  pip_curs;')
+
+    def export_datasets(self, base_dir: str = 'assets/exports', cleanup: bool = False):
+        with self.engine.connect() as con:
+            con.execute('SET search_path TO public;')
+            con.execute('SET work_mem TO "2000MB";')
+
+            # Legacy clean-up
+            if cleanup:
+                self._cleanup(con)
+
+            query = '''create temp table all_datasets as  select
+                schema as schema,
+                id as id,
+                depth,
+                nr_inst as nr_inst,
+                nr_attr as nr_attr,
+                nr_num / nr_attr as nr_num,
+                nr_cat / nr_attr as nr_cat,
+                nr_class as nr_class,
+                nr_missing_values as nr_missing_values,
+                pct_missing_values as pct_missing_values,
+                nr_inst_mv as nr_inst_mv,
+                pct_inst_mv / 100 as pct_inst_mv,
+                nr_attr_mv as nr_attr_mv,
+                pct_attr_mv / 100 as pct_attr_mv,
+                nr_outliers as nr_outliers,
+                skewness_mean as skewness_mean,
+                skewness_sd as skewness_sd,
+                kurtosis_mean as kurtosis_mean,
+                kurtosis_sd as kurtosis_sd,
+                cor_mean as cor_mean,
+                cor_sd as cor_sd,
+                cov_mean as cov_mean,
+                cov_sd as cov_sd,
+                sparsity_mean as sparsity_mean,
+                sparsity_sd as sparsity_sd,
+                var_mean as var_mean,
+                var_sd as var_sd,
+                class_prob_mean as class_prob_mean,
+                class_prob_std as class_prob_std,
+                class_ent as class_ent,
+                attr_ent_mean as attr_ent_mean,
+                attr_ent_sd as attr_ent_sd,
+                mut_inf_mean as mut_inf_mean,
+                mut_inf_sd as mut_inf_sd,
+                eq_num_attr as eq_num_attr,
+                ns_ratio as ns_ratio,
+                nodes as nodes,
+                leaves as leaves,
+                leaves_branch_mean as leaves_branch_mean,
+                leaves_branch_sd as leaves_branch_sd,
+                nodes_per_attr as nodes_per_attr,
+                leaves_per_class_mean as leaves_per_class_mean,
+                leaves_per_class_sd as leaves_per_class_sd,
+                var_importance_mean as var_importance_mean,
+                var_importance_sd as var_importance_sd
+                FROM ('''
+
+            query += 'union '.join([
+                '''select '{s}' as schema, id, depth, nr_inst, nr_attr, nr_num, nr_cat, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd from {s}.datasets d where status = 'complete'\n'''.format(
+                    s=s) for s in self.schemas])
+            query += ') as sub'
+            print(query, end='\n\n\n')
+
+            con.execute(query)
+            con.execute('declare pip_curs CURSOR FOR SELECT * FROM all_datasets')
+            chunk = 0
+            while True:
+
+                df = pd.read_sql('FETCH 200000 FROM pip_curs', con)
+                if df.shape[0] == 0:
+                    break
+                print('Chunk {}'.format(chunk))
+
+                with open('{}/export_datasets_{}.pkl'.format(base_dir, chunk), 'wb') as f:
+                    pickle.dump(df, f)
+                chunk += 1
+
+            con.execute('CLOSE  pip_curs;')
