@@ -1,5 +1,8 @@
 data/
 logfiles/
+assets/**/*.pkl
+assets/**/*.sql
+assets/**/*.zip
 
 
 # Created by .ignore support plugin (hsz.mobi)
