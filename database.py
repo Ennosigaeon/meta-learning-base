@@ -435,7 +435,7 @@ class Database(object):
         # create ORM objects for the tables
         self._define_tables()
 
-        self.schemas = ['d1461', 'd1464', 'd1486', 'd1489', 'd1590', 'd23512', 'd23517', 'd3', 'd31', 'd40668',
+        self.schemas = ['d12', 'd1461', 'd1464', 'd1486', 'd1489', 'd1590', 'd23512', 'd23517', 'd3', 'd31', 'd40668',
                         'd40685', 'd40975', 'd40981', 'd40984', 'd41027', 'd41143', 'd41146', 'd54']
 
     def _define_tables(self) -> None:
@@ -626,13 +626,20 @@ class Database(object):
         else:
             raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))
 
-    def _cleanup(self, con):
+    def _cleanup(self, con, schema: str):
+        if schema == 'd3':
+            con.execute('''delete from d3.algorithms where id >= 10735;
+                        delete from d3.datasets where id >= 727;''')
+        if schema == 'd12':
+            con.execute('''delete from d12.algorithms where id < 16648;
+                        delete from d12.datasets where id < 1725;''')
+
         # Remove obsolete algorithms
         con.execute('''
-            delete from algorithms where id not in (
+            delete from algorithms where id in (
                 select a.id from algorithms a
                 join datasets d on a.input_dataset = d.id
-                where a.start_time >= d.start_time and a.end_time <= d.end_time
+                where a.start_time < d.start_time or a.end_time > d.end_time
             );''')
         # Mark algorithms as errored that did not modify dataset
         con.execute('''
@@ -674,11 +681,14 @@ class Database(object):
                 ) s where replacement != id
             );''')
 
-    def export_pipelines(self, max_depth: int = None, base_dir: str = 'assets/exports', cleanup: bool = False):
+    def export_pipelines(self, max_depth: int = None, base_dir: str = 'assets/exports', schema: str = 'd12',
+                         cleanup: bool = False):
         with self.engine.connect() as con:
-            for schema in self.schemas:
+            for s in self.schemas:
+                if schema is not None and s != schema:
+                    continue
 
-                con.execute('SET search_path TO {};'.format(schema))
+                con.execute('SET search_path TO {};'.format(s))
                 con.execute('SET work_mem TO "2000MB";')
 
                 if max_depth is None:
@@ -690,7 +700,7 @@ class Database(object):
 
                 # Legacy clean-up
                 if cleanup:
-                    self._cleanup(con)
+                    self._cleanup(con, s)
 
                 con.execute('''
                 create materialized view if not exists unique_algorithms as
@@ -725,7 +735,7 @@ class Database(object):
                 dataset_performances = None
                 for d in range(max_depth):
                     query = '''select '{}' as schema, ds, algo, depth, AVG(score) as score, COALESCE(variance(score), 0) as score_var from (\n'''.format(
-                        schema)
+                        s)
 
                     unions = []
                     for i in range(d + 1, max_depth + 1):
@@ -746,17 +756,13 @@ class Database(object):
                     else:
                         dataset_performances = pd.concat([dataset_performances, df], ignore_index=True)
 
-                with open('{}/performance_{}.pkl'.format(base_dir, schema), 'wb') as f:
+                with open('{}/performance_{}.pkl'.format(base_dir, s), 'wb') as f:
                     pickle.dump(dataset_performances, f)
 
     def export_datasets(self, base_dir: str = 'assets/exports', cleanup: bool = False):
         with self.engine.connect() as con:
             con.execute('SET search_path TO public;')
             con.execute('SET work_mem TO "2000MB";')
-
-            # Legacy clean-up
-            if cleanup:
-                self._cleanup(con)
 
             query = '''create temp table all_datasets as  select
                 schema as schema,
