@@ -681,7 +681,7 @@ class Database(object):
                 ) s where replacement != id
             );''')
 
-    def export_pipelines(self, max_depth: int = None, base_dir: str = 'assets/exports', schema: str = 'd12',
+    def export_pipelines(self, max_depth: int = None, base_dir: str = 'assets/exports', schema: str = None,
                          cleanup: bool = False):
         with self.engine.connect() as con:
             for s in self.schemas:
@@ -717,7 +717,12 @@ class Database(object):
                 query += ','.join([textwrap.dedent('''
                     d{d}.id as d{d}_id,
                     a{a}.algorithm as a{a}_algorithm,
-                    a{a}.accuracy as a{a}_accuracy '''.format(d=j, a=j + 1)) for j in range(0, max_depth + 1)])
+                    a{a}.accuracy as a{a}_accuracy,
+                    a{a}.f1_score as a{a}_f1_score,
+                    a{a}.precision as a{a}_precision,
+                    a{a}.recall as a{a}_recall,
+                    a{a}.neg_log_loss as a{a}_neg_log_loss,
+                    a{a}.roc_auc_score as a{a}_roc_auc_score '''.format(d=j, a=j + 1)) for j in range(0, max_depth + 1)])
                 for j in range(0, max_depth + 1):
                     if j == 0:
                         query += 'from datasets d{idx}\n'.format(idx=j)
@@ -734,13 +739,22 @@ class Database(object):
 
                 dataset_performances = None
                 for d in range(max_depth):
-                    query = '''select '{}' as schema, ds, algo, depth, AVG(score) as score, COALESCE(variance(score), 0) as score_var from (\n'''.format(
+                    query = '''select '{}' as schema, ds, algo, depth,
+                                AVG(accuracy) as accuracy, COALESCE(variance(accuracy), 0) as accuracy_var,
+                                AVG(f1_score) as f1_score, COALESCE(variance(f1_score), 0) as f1_score_var,
+                                AVG(precision) as precision, COALESCE(variance(precision), 0) as precision_var,
+                                AVG(recall) as recall, COALESCE(variance(recall), 0) as recall_var,
+                                AVG(log_loss) as log_loss, COALESCE(variance(log_loss), 0) as log_loss_var,
+                                AVG(roc_auc) as roc_auc, COALESCE(variance(roc_auc), 0) as roc_auc_var
+                                from (\n'''.format(
                         s)
 
                     unions = []
                     for i in range(d + 1, max_depth + 1):
                         unions.append(textwrap.dedent(
-                            '''select distinct d{d}_id as ds, a{al}_algorithm as algo, a{a}_accuracy as score, {dep} as depth from pipelines where a{a}_accuracy is not null'''.format(
+                            '''select distinct d{d}_id as ds, a{al}_algorithm as algo, {dep} as depth,
+                              a{a}_accuracy as accuracy, a{a}_f1_score as f1_score, a{a}_precision as precision,
+                              a{a}_recall as recall, a{a}_neg_log_loss as log_loss, a{a}_roc_auc_score as roc_auc from pipelines where a{a}_accuracy is not null'''.format(
                                 d=d, al=d + 1, a=i, dep=i - d)))
                     query += '\nunion '.join(unions)
 
