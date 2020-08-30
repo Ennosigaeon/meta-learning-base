@@ -435,8 +435,9 @@ class Database(object):
         # create ORM objects for the tables
         self._define_tables()
 
-        self.schemas = ['d12', 'd1461', 'd1464', 'd1486', 'd1489', 'd1590', 'd23512', 'd23517', 'd3', 'd31', 'd40668',
-                        'd40685', 'd40975', 'd40981', 'd40984', 'd41027', 'd41143', 'd41146', 'd54']
+        self.schemas = ['d1043', 'd1063', 'd12', 'd1461', 'd1464', 'd1486', 'd1489', 'd1590', 'd18', 'd23512', 'd23517',
+                        'd3', 'd31', 'd40668', 'd40685', 'd40975', 'd40981', 'd40984', 'd41027', 'd41143', 'd41146',
+                        'd458', 'd469', 'd478', 'd54']
 
     def _define_tables(self) -> None:
         """
@@ -773,7 +774,7 @@ class Database(object):
                 with open('{}/performance_{}.pkl'.format(base_dir, s), 'wb') as f:
                     pickle.dump(dataset_performances, f)
 
-    def export_datasets(self, base_dir: str = 'assets/exports', cleanup: bool = False):
+    def export_datasets(self, base_dir: str = 'assets/exports'):
         with self.engine.connect() as con:
             con.execute('SET search_path TO public;')
             con.execute('SET work_mem TO "2000MB";')
@@ -837,7 +838,7 @@ class Database(object):
             chunk = 0
             while True:
 
-                df = pd.read_sql('FETCH 200000 FROM pip_curs', con)
+                df = pd.read_sql('FETCH 500000 FROM pip_curs', con)
                 if df.shape[0] == 0:
                     break
                 print('Chunk {}'.format(chunk))
