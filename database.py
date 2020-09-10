@@ -435,9 +435,10 @@ class Database(object):
         # create ORM objects for the tables
         self._define_tables()
 
-        self.schemas = ['d1043', 'd1063', 'd12', 'd1461', 'd1464', 'd1486', 'd1489', 'd1590', 'd18', 'd23512', 'd23517',
-                        'd3', 'd31', 'd40668', 'd40685', 'd40975', 'd40981', 'd40984', 'd41027', 'd41143', 'd41146',
-                        'd458', 'd469', 'd478', 'd54']
+        # TODO 'd1498' very slow
+        self.schemas = ['d1043', 'd1063', 'd12', 'd1461', 'd1464', 'd1471', 'd1486', 'd1489', 'd1590', 'd18',
+                        'd23512', 'd23517', 'd3', 'd31', 'd40668', 'd40685', 'd40975', 'd40981', 'd40984', 'd41027',
+                        'd41143', 'd41146', 'd41168', 'd458', 'd469', 'd478', 'd54']
 
     def _define_tables(self) -> None:
         """
@@ -723,8 +724,8 @@ class Database(object):
                     a{a}.precision as a{a}_precision,
                     a{a}.recall as a{a}_recall,
                     a{a}.neg_log_loss as a{a}_neg_log_loss,
-                    a{a}.roc_auc_score as a{a}_roc_auc_score '''.format(d=j, a=j + 1)) for j in range(0, max_depth + 1)])
-                for j in range(0, max_depth + 1):
+                    a{a}.roc_auc_score as a{a}_roc_auc_score '''.format(d=j, a=j + 1)) for j in range(0, max_depth)])
+                for j in range(0, max_depth):
                     if j == 0:
                         query += 'from datasets d{idx}\n'.format(idx=j)
                     else:
@@ -733,7 +734,7 @@ class Database(object):
                     cond = '''.status = 'complete' ''' if j < max_depth else '.accuracy is not null'
                     query += '''join algorithms a{a} on d{d}.id = a{a}.input_dataset and a{a}{cond}\n'''.format(
                         a=j + 1, d=j, cond=cond)
-                query += 'where d0."depth" = 0;'.format(max_depth + 1)
+                query += 'where d0."depth" = 0;'.format(max_depth)
                 print(query, end='\n\n\n')
 
                 con.execute(query)
@@ -752,6 +753,8 @@ class Database(object):
 
                     unions = []
                     for i in range(d + 1, max_depth + 1):
+                        # cond = ' and '.join(['d{}_id < d{}_id'.format(j, j+1) for j in range(0, i - 1)]) if i > 1 else 'true'
+
                         unions.append(textwrap.dedent(
                             '''select distinct d{d}_id as ds, a{al}_algorithm as algo, {dep} as depth,
                               a{a}_accuracy as accuracy, a{a}_f1_score as f1_score, a{a}_precision as precision,
