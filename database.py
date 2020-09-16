@@ -1,17 +1,21 @@
 from __future__ import absolute_import, unicode_literals
 
 import hashlib
-
-from ConfigSpace.configuration_space import Configuration
+import pickle
+import textwrap
 from builtins import object
 from datetime import datetime
-from sklearn.base import BaseEstimator
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine, BigInteger
-from sqlalchemy.engine.url import URL
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from typing import Optional, List
 
+import pandas as pd
+from ConfigSpace.configuration_space import Configuration
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, create_engine, BigInteger
+from sqlalchemy.engine.url import URL
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+
+from automl.components.base import EstimatorComponent
 from constants import AlgorithmStatus, RunStatus
 from data import load_data
 from methods import ALGORITHMS
@@ -19,7 +23,7 @@ from utilities import base_64_to_object, object_to_base_64
 
 
 class DBSession(object):
-    def __init__(self, db, commit=False):
+    def __init__(self, db: 'Database', commit=False):
         self.db = db
         self.commit = commit
 
@@ -68,6 +72,7 @@ Base = declarative_base()
 
 class Dataset(Base):
     __tablename__ = 'datasets'
+    # __table_args__ = {'schema': 'mlb'}
 
     HybridType = Integer()
     HybridType = HybridType.with_variant(BigInteger(), 'postgresql')
@@ -93,6 +98,8 @@ class Dataset(Base):
     """
     nr_inst = Column(Numeric)
     nr_attr = Column(Numeric)
+    nr_num = Column(Numeric)
+    nr_cat = Column(Numeric)
     nr_class = Column(Numeric)
     nr_missing_values = Column(Numeric)
     pct_missing_values = Column(Numeric)
@@ -155,9 +162,9 @@ class Dataset(Base):
     def __init__(self, train_path, name=None, id=None, status=RunStatus.PENDING,
                  start_time: datetime = None, end_time: datetime = None, processed: int = 0, budget: int = 5,
                  depth: int = 0, hashcode: str = None,
-                 nr_inst=None, nr_attr=None, nr_class=None, nr_outliers=None, skewness_mean=None, skewness_sd=None,
-                 kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None, cov_mean=None, cov_sd=None,
-                 sparsity_mean=None, sparsity_sd=None,
+                 nr_inst=None, nr_attr=None, nr_num=None, nr_cat=None, nr_class=None, nr_outliers=None,
+                 skewness_mean=None, skewness_sd=None, kurtosis_mean=None, kurtosis_sd=None, cor_mean=None, cor_sd=None,
+                 cov_mean=None, cov_sd=None, sparsity_mean=None, sparsity_sd=None,
                  var_mean=None, var_sd=None, class_ent=None, attr_ent_mean=None, attr_ent_sd=None, mut_inf_mean=None,
                  mut_inf_sd=None, eq_num_attr=None, ns_ratio=None, nodes=None, leaves=None,
                  leaves_branch_mean=None, leaves_branch_sd=None, nodes_per_attr=None, leaves_per_class_mean=None,
@@ -180,6 +187,8 @@ class Dataset(Base):
 
         self.nr_inst = nr_inst
         self.nr_attr = nr_attr
+        self.nr_num = nr_num
+        self.nr_cat = nr_cat
         self.nr_class = nr_class
         self.nr_missing_values = nr_missing_values
         self.pct_missing_values = pct_missing_values
@@ -234,9 +243,23 @@ class Dataset(Base):
     def __repr__(self):
         return "<{}: {} classes, {} features, {} rows>".format(self.name, self.nr_class, self.nr_attr, self.nr_inst)
 
+    def get_mf(self):
+        return [self.nr_inst, self.nr_attr, self.nr_num, self.nr_cat, self.nr_class, self.nr_missing_values,
+                self.pct_missing_values,
+                self.nr_inst_mv, self.pct_inst_mv, self.nr_attr_mv, self.pct_attr_mv, self.nr_outliers,
+                self.skewness_mean, self.skewness_sd, self.kurtosis_mean, self.kurtosis_sd, self.cor_mean, self.cor_sd,
+                self.cov_mean, self.cov_sd, self.sparsity_mean, self.sparsity_sd, self.var_mean, self.var_sd,
+                self.class_prob_mean, self.class_prob_std, self.class_ent, self.attr_ent_mean, self.attr_ent_sd,
+                self.mut_inf_mean, self.mut_inf_sd, self.eq_num_attr, self.ns_ratio, self.nodes, self.leaves,
+                self.leaves_branch_mean, self.leaves_branch_sd, self.nodes_per_attr, self.leaves_per_class_mean,
+                self.leaves_per_class_sd, self.var_importance_mean, self.var_importance_sd, self.one_nn_mean,
+                self.one_nn_sd, self.best_node_mean, self.best_node_sd, self.linear_discr_mean, self.linear_discr_sd,
+                self.naive_bayes_mean, self.naive_bayes_sd]
+
 
 class Algorithm(Base):
     __tablename__ = 'algorithms'
+    # __table_args__ = {'schema': 'mlb'}
 
     HybridType = Integer()
     HybridType = HybridType.with_variant(BigInteger(), 'postgresql')
@@ -311,6 +334,13 @@ class Algorithm(Base):
                  end_time: datetime = None,
                  error_message: str = None,
                  hyperparameter_values: Configuration = None,
+                 hyperparameter_values_64: str = None,
+                 accuracy: float = None,
+                 f1_score: float = None,
+                 precision: float = None,
+                 recall: float = None,
+                 neg_log_loss: float = None,
+                 roc_auc_score: float = None,
                  host=None):
 
         self.algorithm: str = algorithm
@@ -321,8 +351,19 @@ class Algorithm(Base):
         self.start_time: Optional[datetime] = start_time
         self.end_time: Optional[datetime] = end_time
         self.error_message: Optional[str] = error_message
-        self.hyperparameter_values = hyperparameter_values
+        if hyperparameter_values is not None:
+            self.hyperparameter_values = hyperparameter_values
+        else:
+            self.hyperparameter_values_64 = hyperparameter_values_64
         self.host = host
+
+        self.accuracy = accuracy
+        self.f1_score = f1_score
+        self.precision = precision
+        self.recall = recall
+        self.neg_log_loss = neg_log_loss
+        self.roc_auc_score = roc_auc_score
+
         self._load_cs()
 
     def _load_cs(self):
@@ -339,7 +380,7 @@ class Algorithm(Base):
     def default_config(self) -> Configuration:
         return self.cs.get_default_configuration()
 
-    def instance(self, params: dict = None) -> BaseEstimator:
+    def instance(self, params: dict = None) -> EstimatorComponent:
         if params is None:
             if self.hyperparameter_values is None:
                 params = self.random_config().get_dictionary()
@@ -350,6 +391,12 @@ class Algorithm(Base):
         # noinspection PyTypeChecker
         # EstimatorComponent inherits from BaseEstimator
         return instance
+
+    def get_performance(self):
+        return [self.accuracy, self.f1_score, self.precision, self.recall, self.neg_log_loss, self.roc_auc_score]
+
+    def get_config_array(self):
+        return Configuration(self.cs, self.hyperparameter_values).get_array()
 
     def __repr__(self):
         params = '\n'.join(
@@ -381,12 +428,17 @@ class Database(object):
         db_url = URL(drivername=dialect, database=database, username=username,
                      password=password, host=host, port=port, query=query)
         self.engine = create_engine(db_url, pool_pre_ping=True, pool_recycle=3600)
-        self.session = None
+        self.session: Optional[Session] = None
         self.get_session = sessionmaker(bind=self.engine,
                                         expire_on_commit=False)
 
         # create ORM objects for the tables
         self._define_tables()
+
+        # TODO 'd1498' very slow
+        self.schemas = ['d1043', 'd1063', 'd12', 'd1461', 'd1464', 'd1471', 'd1486', 'd1489', 'd1590', 'd18',
+                        'd23512', 'd23517', 'd3', 'd31', 'd40668', 'd40685', 'd40975', 'd40981', 'd40984', 'd41027',
+                        'd41143', 'd41146', 'd41168', 'd41169', 'd458', 'd469', 'd478', 'd54']
 
     def _define_tables(self) -> None:
         """
@@ -433,6 +485,33 @@ class Database(object):
         if len(datasets) == 0:
             return None
         return datasets
+
+    @try_with_session(commit=True)
+    def select_dataset(self) -> Optional[Dataset]:
+        try:
+            rs = self.session.execute('''
+            UPDATE {table}
+            SET    status = '{running}' 
+            WHERE  id = (
+                SELECT id  FROM {table} WHERE  status = '{pending}'
+                ORDER BY depth DESC LIMIT 1 FOR UPDATE SKIP LOCKED
+             )
+            RETURNING id;
+            '''.format(table=Dataset.__tablename__, running=RunStatus.RUNNING, pending=RunStatus.PENDING))
+
+        except OperationalError:
+            rs = self.session.execute('''
+                SELECT id  FROM {table} WHERE  status = '{pending}' ORDER BY depth DESC LIMIT 1
+            '''.format(table=Dataset.__tablename__, pending=RunStatus.PENDING))
+
+        try:
+            id = next(rs)['id']
+            ds = self.get_dataset(id)
+            ds.status = RunStatus.RUNNING
+            ds.start_time = datetime.now()
+            return ds
+        except StopIteration:
+            return None
 
     @try_with_session()
     def get_datasets_by_hash(self, hashcode: str) -> List[Dataset]:
@@ -548,3 +627,227 @@ class Database(object):
             dataset.end_time = datetime.now()
         else:
             raise ValueError('Dataset {} in unknown status {}'.format(dataset_id, dataset.status))
+
+    def _cleanup(self, con, schema: str):
+        if schema == 'd3':
+            con.execute('''delete from d3.algorithms where id >= 10735;
+                        delete from d3.datasets where id >= 727;''')
+        if schema == 'd12':
+            con.execute('''delete from d12.algorithms where id < 16648;
+                        delete from d12.datasets where id < 1725;''')
+
+        # Remove obsolete algorithms
+        con.execute('''
+            delete from algorithms where id in (
+                select a.id from algorithms a
+                join datasets d on a.input_dataset = d.id
+                where a.start_time < d.start_time or a.end_time > d.end_time
+            );''')
+        # Mark algorithms as errored that did not modify dataset
+        con.execute('''
+            update algorithms
+            set status = 'errored', accuracy = 0, f1_score = 0, "precision" = 0, recall = 0, roc_auc_score = 0, neg_log_loss = 100
+            where output_dataset = input_dataset and status != 'errored';''')
+        # Remove dataset duplicates
+        con.execute('''
+            update algorithms a
+            set output_dataset = sub.id
+            from (
+                select id, unnest(replacement) as replacement from (
+                    select min(id) as id, count(*) as count, array_agg(id) as replacement
+                    from datasets d
+                    where status != 'skipped' and nr_inst != 0
+                    group by nr_inst, nr_attr, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd, one_nn_mean, one_nn_sd, best_node_mean, best_node_sd, linear_discr_mean, linear_discr_sd, naive_bayes_mean, naive_bayes_sd
+                ) s where count > 1
+            ) as sub
+            where a.output_dataset = sub.replacement and sub.id != sub.replacement;
+            update algorithms a
+            set input_dataset = sub.id
+            from (
+                select id, unnest(replacement) as replacement from (
+                    select min(id) as id, count(*) as count, array_agg(id) as replacement
+                    from datasets d
+                    where status != 'skipped' and nr_inst != 0
+                    group by nr_inst, nr_attr, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd, one_nn_mean, one_nn_sd, best_node_mean, best_node_sd, linear_discr_mean, linear_discr_sd, naive_bayes_mean, naive_bayes_sd
+                ) s where count > 1
+            ) as sub
+            where a.input_dataset = sub.replacement and sub.id != sub.replacement;
+            delete from datasets where id in (
+              select replacement from (
+                select id, unnest(replacement) as replacement from (
+                  select min(id) as id, count(*) as count, array_agg(id) as replacement
+                    from datasets d
+                    where status != 'skipped' and nr_inst != 0
+                    group by nr_inst, nr_attr, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd, one_nn_mean, one_nn_sd, best_node_mean, best_node_sd, linear_discr_mean, linear_discr_sd, naive_bayes_mean, naive_bayes_sd
+                  ) s where count > 1
+                ) s where replacement != id
+            );''')
+
+    def export_pipelines(self, max_depth: int = None, base_dir: str = 'assets/exports', schema: str = None,
+                         cleanup: bool = False):
+        with self.engine.connect() as con:
+            for s in self.schemas:
+                if schema is not None and s != schema:
+                    continue
+
+                con.execute('SET search_path TO {};'.format(s))
+                con.execute('SET work_mem TO "2000MB";')
+
+                if max_depth is None:
+                    rs = con.execute('select max(depth) from datasets d')
+                    for row in rs:
+                        max_depth = row[0] + 1
+                    if max_depth is None:
+                        raise ValueError('max_depth is None')
+
+                # Legacy clean-up
+                if cleanup:
+                    self._cleanup(con, s)
+
+                con.execute('''
+                create materialized view if not exists unique_algorithms as
+                select MIN(id) as id, COUNT(id) as count, status, algorithm, hyperparameter_values_64, input_dataset, output_dataset,
+                AVG(accuracy) as accuracy, AVG(f1_score) as f1_score, AVG("precision") as "precision", AVG(recall) as recall, AVG(neg_log_loss) as neg_log_loss, AVG(roc_auc_score) as roc_auc_score
+                from algorithms a
+                group by algorithm, status, hyperparameter_values_64, input_dataset, output_dataset;
+                ''')
+                con.execute('create materialized view if not exists unique_datasets as select * from datasets d;')
+
+                con.execute('drop MATERIALIZED view if exists pipelines;')
+
+                query = 'create materialized view pipelines as select'
+                query += ','.join([textwrap.dedent('''
+                    d{d}.id as d{d}_id,
+                    a{a}.algorithm as a{a}_algorithm,
+                    a{a}.accuracy as a{a}_accuracy,
+                    a{a}.f1_score as a{a}_f1_score,
+                    a{a}.precision as a{a}_precision,
+                    a{a}.recall as a{a}_recall,
+                    a{a}.neg_log_loss as a{a}_neg_log_loss,
+                    a{a}.roc_auc_score as a{a}_roc_auc_score '''.format(d=j, a=j + 1)) for j in range(0, max_depth)])
+                for j in range(0, max_depth):
+                    if j == 0:
+                        query += 'from datasets d{idx}\n'.format(idx=j)
+                    else:
+                        query += '''join datasets d{idx} on d{idx}.id = a{idx}.output_dataset\n'''.format(idx=j)
+
+                    cond = '''.status = 'complete' ''' if j < max_depth else '.accuracy is not null'
+                    query += '''join algorithms a{a} on d{d}.id = a{a}.input_dataset and a{a}{cond}\n'''.format(
+                        a=j + 1, d=j, cond=cond)
+                query += 'where d0."depth" = 0;'.format(max_depth)
+                print(query, end='\n\n\n')
+
+                con.execute(query)
+
+                dataset_performances = None
+                for d in range(max_depth):
+                    query = '''select '{}' as schema, ds, algo, depth,
+                                AVG(accuracy) as accuracy, COALESCE(variance(accuracy), 0) as accuracy_var,
+                                AVG(f1_score) as f1_score, COALESCE(variance(f1_score), 0) as f1_score_var,
+                                AVG(precision) as precision, COALESCE(variance(precision), 0) as precision_var,
+                                AVG(recall) as recall, COALESCE(variance(recall), 0) as recall_var,
+                                AVG(log_loss) as log_loss, COALESCE(variance(log_loss), 0) as log_loss_var,
+                                AVG(roc_auc) as roc_auc, COALESCE(variance(roc_auc), 0) as roc_auc_var
+                                from (\n'''.format(
+                        s)
+
+                    unions = []
+                    for i in range(d + 1, max_depth + 1):
+                        # cond = ' and '.join(['d{}_id < d{}_id'.format(j, j+1) for j in range(0, i - 1)]) if i > 1 else 'true'
+
+                        unions.append(textwrap.dedent(
+                            '''select distinct d{d}_id as ds, a{al}_algorithm as algo, {dep} as depth,
+                              a{a}_accuracy as accuracy, a{a}_f1_score as f1_score, a{a}_precision as precision,
+                              a{a}_recall as recall, a{a}_neg_log_loss as log_loss, a{a}_roc_auc_score as roc_auc from pipelines where a{a}_accuracy is not null'''.format(
+                                d=d, al=d + 1, a=i, dep=i - d)))
+                    query += '\nunion '.join(unions)
+
+                    query += '\n) as raw group by ds, algo, depth order by ds, algo, depth;'
+                    print(query)
+
+                    df = pd.read_sql(query, con)
+                    if df.shape[0] == 0:
+                        break
+
+                    if dataset_performances is None:
+                        dataset_performances = df
+                    else:
+                        dataset_performances = pd.concat([dataset_performances, df], ignore_index=True)
+
+                with open('{}/performance_{}.pkl'.format(base_dir, s), 'wb') as f:
+                    pickle.dump(dataset_performances, f)
+
+    def export_datasets(self, base_dir: str = 'assets/exports'):
+        with self.engine.connect() as con:
+            con.execute('SET search_path TO public;')
+            con.execute('SET work_mem TO "2000MB";')
+
+            query = '''create temp table all_datasets as  select
+                schema as schema,
+                id as id,
+                depth,
+                nr_inst as nr_inst,
+                nr_attr as nr_attr,
+                nr_num / nr_attr as nr_num,
+                nr_cat / nr_attr as nr_cat,
+                nr_class as nr_class,
+                nr_missing_values as nr_missing_values,
+                pct_missing_values as pct_missing_values,
+                nr_inst_mv as nr_inst_mv,
+                pct_inst_mv / 100 as pct_inst_mv,
+                nr_attr_mv as nr_attr_mv,
+                pct_attr_mv / 100 as pct_attr_mv,
+                nr_outliers as nr_outliers,
+                skewness_mean as skewness_mean,
+                skewness_sd as skewness_sd,
+                kurtosis_mean as kurtosis_mean,
+                kurtosis_sd as kurtosis_sd,
+                cor_mean as cor_mean,
+                cor_sd as cor_sd,
+                cov_mean as cov_mean,
+                cov_sd as cov_sd,
+                sparsity_mean as sparsity_mean,
+                sparsity_sd as sparsity_sd,
+                var_mean as var_mean,
+                var_sd as var_sd,
+                class_prob_mean as class_prob_mean,
+                class_prob_std as class_prob_std,
+                class_ent as class_ent,
+                attr_ent_mean as attr_ent_mean,
+                attr_ent_sd as attr_ent_sd,
+                mut_inf_mean as mut_inf_mean,
+                mut_inf_sd as mut_inf_sd,
+                eq_num_attr as eq_num_attr,
+                ns_ratio as ns_ratio,
+                nodes as nodes,
+                leaves as leaves,
+                leaves_branch_mean as leaves_branch_mean,
+                leaves_branch_sd as leaves_branch_sd,
+                nodes_per_attr as nodes_per_attr,
+                leaves_per_class_mean as leaves_per_class_mean,
+                leaves_per_class_sd as leaves_per_class_sd,
+                var_importance_mean as var_importance_mean,
+                var_importance_sd as var_importance_sd
+                FROM ('''
+
+            query += 'union '.join([
+                '''select '{s}' as schema, id, depth, nr_inst, nr_attr, nr_num, nr_cat, nr_class, nr_missing_values, pct_missing_values, nr_inst_mv, pct_inst_mv, nr_attr_mv, pct_attr_mv, nr_outliers, skewness_mean, skewness_sd, kurtosis_mean, kurtosis_sd, cor_mean, cor_sd, cov_mean, cov_sd, sparsity_mean, sparsity_sd, var_mean, var_sd, class_prob_mean, class_prob_std, class_ent, attr_ent_mean, attr_ent_sd, mut_inf_mean, mut_inf_sd, eq_num_attr, ns_ratio, nodes, leaves, leaves_branch_mean, leaves_branch_sd, nodes_per_attr, leaves_per_class_mean, leaves_per_class_sd, var_importance_mean, var_importance_sd from {s}.datasets d where status = 'complete'\n'''.format(
+                    s=s) for s in self.schemas])
+            query += ') as sub'
+            print(query, end='\n\n\n')
+
+            con.execute(query)
+            con.execute('declare pip_curs CURSOR FOR SELECT * FROM all_datasets')
+            chunk = 0
+            while True:
+
+                df = pd.read_sql('FETCH 500000 FROM pip_curs', con)
+                if df.shape[0] == 0:
+                    break
+                print('Chunk {}'.format(chunk))
+
+                with open('{}/export_datasets_{}.pkl'.format(base_dir, chunk), 'wb') as f:
+                    pickle.dump(df, f)
+                chunk += 1
+
+            con.execute('CLOSE  pip_curs;')

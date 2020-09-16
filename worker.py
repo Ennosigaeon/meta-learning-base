@@ -257,16 +257,51 @@ class Worker(object):
                 raise ex
             LOGGER.error('Failed to select hyperparameters', ex)
             raise AlgorithmError(str(ex), traceback.format_exc())
+        # Run algorithm and store result
+        return self._run_algorithm(algorithm, params)
 
+    def run_default(self):
         """
-        Create the algorithm and add it to the database
+        Runs all available algorithms with default hyperparameters on this dataset
         """
+
+        if self.complete_pipelines or self.dataset.depth + 1 >= self.max_pipeline_depth:
+            candidates = CLASSIFIERS.keys()
+        else:
+            candidates = ALGORITHMS.keys()
+        for algo_type in candidates:
+            try:
+                LOGGER.info('Starting new algorithm \'{}\'...'.format(algo_type))
+                algorithm = Algorithm(algo_type,
+                                      input_dataset=self.dataset.id,
+                                      output_dataset=None,
+                                      status=AlgorithmStatus.RUNNING,
+                                      start_time=datetime.now(),
+                                      host=HOSTNAME)
+
+                """Save a random configuration of the algorithms hyperparameters in params"""
+                params = algorithm.default_config()
+                algorithm.hyperparameter_values = params
+
+                param_info = 'Chose parameters for algorithm :'.format(algorithm.hyperparameter_values)
+                for k in sorted(params.keys()):
+                    param_info += '\n\t{} = {}'.format(k, params[k])
+                LOGGER.debug(param_info)
+            except Exception as ex:
+                if isinstance(ex, KeyboardInterrupt):
+                    raise ex
+                LOGGER.error('Failed to select hyperparameters', ex)
+                raise AlgorithmError(str(ex), traceback.format_exc())
+
+            # Run algorithm and store result
+            self._run_algorithm(algorithm, params)
+
+    def _run_algorithm(self, algorithm, params):
+        # Create the algorithm and add it to the database
         algorithm = self.db.create_algorithm(dataset_id=self.dataset.id,
                                              algorithm=algorithm)
 
-        """
-        Transform the dataset and save the algorithm
-        """
+        # Transform the dataset and save the algorithm
         try:
             wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout, affinity=self.affinity,
                                                logger=self.subprocess_logger)(self.transform_dataset)

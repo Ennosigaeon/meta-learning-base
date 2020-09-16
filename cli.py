@@ -31,6 +31,7 @@ def _work(args):
     core = _get_core(args)
 
     core.work(
+        use_defaults=True,
         choose_randomly=False,
         wait=False
     )
@@ -54,6 +55,18 @@ def _enter_data(args):
     dataset = core.add_dataset(df, class_column, depth=0, name=dataset_conf.name)
 
     return dataset.id
+
+
+def _export_pipelines(args):
+    core = _get_core(args)
+    core.export_pipelines()
+    print('Export pipelines')
+
+
+def _export_datasets(args):
+    core = _get_core(args)
+    core.export_datasets()
+    print('Export datasets')
 
 
 def _get_parser():
@@ -110,6 +123,21 @@ def _get_parser():
     worker.set_defaults(action=_work)
     worker.add_argument('--datasets', help='Only train on datasets with these ids', nargs='+')
     worker.add_argument('--total-time', help='Number of seconds to run worker', type=int)
+
+    # Export Data
+    export_data = [
+        logging_args,
+        log_args,
+        sql_args,
+        generic_args
+    ]
+    export_pipelines = subparsers.add_parser('export_pipelines', parents=export_data,
+                                             help='Export all data sets and algorithms to a DataFrame')
+    export_pipelines.set_defaults(action=_export_pipelines)
+
+    export_datasets = subparsers.add_parser('export_datasets', parents=export_data,
+                                            help='Export all data sets and algorithms to a DataFrame')
+    export_datasets.set_defaults(action=_export_datasets)
 
     return parser
 

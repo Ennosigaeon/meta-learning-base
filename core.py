@@ -24,7 +24,7 @@ from pympler import muppy, summary, refbrowser
 from tqdm import tqdm
 
 from constants import RunStatus
-from data import store_data, upload_data
+from data import store_data, upload_data, delete_data
 from database import Database, Dataset
 from metafeatures import MetaFeatures
 from utilities import hash_file
@@ -51,7 +51,7 @@ class Core(object):
             # Generic Conf
             work_dir: str = None,
             timeout: int = None,
-            cache_percentage: float = 0.9,
+            cache_percentage: float = 0.99,
             dataset_budget: int = None,
             max_pipeline_depth: int = 5,
 
@@ -123,6 +123,7 @@ class Core(object):
             df_old = ds.load(self.s3_config, self.s3_bucket)
             if df.equals(df_old):
                 LOGGER.info('New dataset equals dataset {} and is not stored in the DB.'.format(ds.id))
+                delete_data(local_file)
                 return ds
             del df_old
 
@@ -149,6 +150,7 @@ class Core(object):
         if not success:
             LOGGER.info('Meta-feature extraction failed. Marking this dataset as \'skipped\'')
             mf['status'] = RunStatus.SKIPPED
+            delete_data(local_file)
 
         """Saves input dataset and calculated meta-features to db"""
         if budget is None:
@@ -167,6 +169,8 @@ class Core(object):
     def _cache_locally(self, df: pd.DataFrame, name: str) -> str:
         def clean_cache():
             LOGGER.info('Cleaning cache. This may take some while...')
+            # For complete local execution do not clean cache!
+            exit(-1)
 
             shutil.rmtree(self.work_dir)
             Path(self.work_dir).mkdir(parents=True, exist_ok=True)
@@ -190,10 +194,12 @@ class Core(object):
         LOGGER.info('Received abort signal. Stopping processing after current evaluation...')
         self._abort = True
 
-    def work(self, choose_randomly=True, wait=True, verbose=False):
+    def work(self, use_defaults=True, choose_randomly=True, wait=True, verbose=False):
         """Get unfinished Datasets from the database and work on them.
 
         Args:
+            use_defaults (bool):
+                <MISSING>
             choose_randomly (bool):
                 If ``True``, work on all the highest-priority datasets in random order.
                 Otherwise, work on them in sequential order (by ID).
@@ -216,6 +222,7 @@ class Core(object):
 
         # Count number of running workers
         pids = set()
+        core = None
         if self.affinity:
             for p in psutil.process_iter():
                 if re.match('.*python\\d?', p.name()) and 'worker' in p.cmdline() and \
@@ -230,11 +237,25 @@ class Core(object):
                 LOGGER.info("Stopping processing due to user request")
                 break
 
-            """
-            Get all pending and running datasets, or all pending/running datasets from the list we were given
-            """
-            datasets = self.db.get_datasets()
-            if not datasets:
+            ds = None
+            if use_defaults:
+                ds = self.db.select_dataset()
+            else:
+                # Get all pending and running datasets, or all pending/running datasets from the list we were given
+                datasets = self.db.get_datasets()
+                if len(datasets) > 0:
+                    # Either choose a dataset randomly between priority, or take the dataset with the lowest ID"""
+                    if choose_randomly:
+                        ds = random.choice(datasets)
+                    else:
+                        ds = sorted(datasets, key=attrgetter('id'))[0]
+                    del datasets
+                    try:
+                        self.db.mark_dataset_running(ds.id)
+                    except UserWarning:
+                        LOGGER.warning('Skipping completed dataset: {}'.format(ds.id))
+
+            if not ds:
                 if wait:
                     LOGGER.debug('No datasets found. Sleeping %d seconds and trying again.', self._LOOP_WAIT)
                     time.sleep(self._LOOP_WAIT)
@@ -242,22 +263,8 @@ class Core(object):
                 else:
                     LOGGER.info('No datasets found. Exiting.')
                     break
-
-            """Either choose a dataset randomly between priority, or take the dataset with the lowest ID"""
-            if choose_randomly:
-                ds = random.choice(datasets)
-            else:
-                ds = sorted(datasets, key=attrgetter('id'))[0]
             LOGGER.info('Computing on dataset {}'.format(ds.id))
             worker = None
-
-            """
-            Mark dataset as RUNNING
-            """
-            try:
-                self.db.mark_dataset_running(ds.id)
-            except UserWarning:
-                LOGGER.warning('Skipping completed dataset: {}'.format(ds.id))
 
             """
             Progress bar
@@ -276,6 +283,12 @@ class Core(object):
 
                 """Call run_algorithm as long as the chosen dataset is marked as RUNNING"""
                 while ds.status == RunStatus.RUNNING:
+                    if use_defaults:
+                        worker.run_default()
+                        self.db.mark_dataset_complete(ds.id)
+                        delete_data(ds.train_path)
+                        break
+
                     success = worker.run_algorithm()
                     ds = self.db.get_dataset(ds.id)
                     if verbose and ds.processed > pbar.last_print_n:
@@ -312,5 +325,11 @@ class Core(object):
                 LOGGER.error('Something went wrong. Sleeping {} seconds.'.format(self._LOOP_WAIT))
                 time.sleep(self._LOOP_WAIT)
             finally:
-                del datasets
                 del worker
+
+    def export_pipelines(self):
+        return self.db.export_pipelines()
+
+    def export_datasets(self):
+        return self.db.export_datasets()
+
