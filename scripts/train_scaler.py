@@ -2,16 +2,16 @@ import pickle
 import warnings
 
 import joblib
-import numpy as np
 import pandas as pd
 from sklearn import clone
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import SGDRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, FunctionTransformer, RobustScaler
-from sklearn.svm import SVR
+
+from automl.util import util
 
 warnings.filterwarnings("ignore", message="divide by zero encountered in divide")
 warnings.filterwarnings("ignore", message="divide by zero encountered")
@@ -70,38 +70,17 @@ if __name__ == '__main__':
     schemas = pd.unique(df['schema'])
     X_train = merged[merged['depth'] < 3]
 
-    from sklearn_pandas import DataFrameMapper
-
-    ohe = DataFrameMapper([(['algo'], OneHotEncoder(), {'prefix': ''})], df_out=True, default=None)
-    log = DataFrameMapper([(['nr_inst'], FunctionTransformer(np.log)),
-                           (['nr_attr'], FunctionTransformer(np.log)),
-                           (['nr_class'], FunctionTransformer(np.log)), ], df_out=True, input_df=True, default=None)
-    scale = DataFrameMapper([(['nr_inst'], RobustScaler()),
-                             (['nr_attr'], RobustScaler()),
-                             (['nr_class'], RobustScaler()),
-                             (['skewness_mean'], RobustScaler()),
-                             (['skewness_sd'], RobustScaler()),
-                             (['kurtosis_mean'], RobustScaler()),
-                             (['kurtosis_sd'], RobustScaler()),
-                             (['cov_mean'], RobustScaler()),
-                             (['cov_sd'], RobustScaler()),
-                             (['var_mean'], RobustScaler()),
-                             (['var_sd'], RobustScaler()),
-                             (['class_ent'], RobustScaler()),
-                             (['attr_ent_mean'], RobustScaler()),
-                             (['attr_ent_sd'], RobustScaler()),
-                             (['ns_ratio'], RobustScaler()),
-                             (['nodes'], RobustScaler()),
-                             (['leaves'], RobustScaler()),
-                             (['leaves_branch_mean'], RobustScaler()),
-                             (['leaves_branch_sd'], RobustScaler()),
-                             (['nodes_per_attr'], RobustScaler())], df_out=True, input_df=True, default=None)
+    log = ColumnTransformer([('log', FunctionTransformer(util.object_log), [0, 1, 4])], remainder='passthrough')
+    scale = ColumnTransformer([('scale', RobustScaler(),
+                                [0, 1, 2, 5, 7, 9, 11, 12, 13, 14, 15, 18, 19, 22, 23] + list(range(26, 38)))],
+                              remainder='passthrough')
+    ohe = ColumnTransformer([('ohe', OneHotEncoder(), [42])], remainder='passthrough')
 
     pipelines = {
         'rf': Pipeline([
-            ('ohe', ohe),
             ('log', log),
             ('scale', scale),
+            ('ohe', ohe),
             ('regression', RandomForestRegressor(n_jobs=6, n_estimators=20))
         ]),
         # 'svr': Pipeline([
@@ -111,9 +90,9 @@ if __name__ == '__main__':
         #     ('regression', SVR())
         # ]),
         'sgd': Pipeline([
-            ('ohe', ohe),
             ('log', log),
             ('scale', scale),
+            ('ohe', ohe),
             ('regression', SGDRegressor())
         ])
     }
@@ -121,8 +100,9 @@ if __name__ == '__main__':
     # Xt = pipeline.fit_transform(X_train, X_train['f1_score'])
 
     for schema in sorted(schemas):
-        X_train = merged[(merged['depth'] < 3) & (merged['schema'] != schema)]
-        X_val = merged[(merged['depth'] < 3) & (merged['schema'] == schema)]
+        schema = 'complete'
+        X_train = merged[merged['depth'] < 3]
+        X_val = merged[merged['depth'] < 3]
         y_train = X_train['f1_score'], X_train['f1_score_var']
         y_val = X_val['f1_score'], X_val['f1_score_var']
 
@@ -133,10 +113,10 @@ if __name__ == '__main__':
 
         for name, pipeline in pipelines.items():
             mean_pipeline = clone(pipeline)
-            mean_pipeline.fit(X_train, y_train[0])
+            mean_pipeline.fit(X_train.to_numpy(), y_train[0].to_numpy())
 
             var_pipeline = clone(pipeline)
-            var_pipeline.fit(X_train, y_train[1])
+            var_pipeline.fit(X_train.to_numpy(), y_train[1].to_numpy())
 
             mean_predict = mean_pipeline.predict(X_val)
             var_predict = var_pipeline.predict(X_val)
