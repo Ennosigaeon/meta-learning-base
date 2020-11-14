@@ -106,9 +106,9 @@ performance.
 ## Pretrained data
 
 For simplicity, we directly provide a [random forest regression model]() trained on all available data ready to use.
-Additionally, we provide database dumps for the evaluation of [30 datasets](). We recommend to use a distinct schema for
-each dump. Each dump creates filled table `algorithm` and `dataset` in the `public` schema. After import, you should move
-the public schema to a new schema.
+Additionally, we provide database dumps of the evaluation of 30 datasets in the _assets/defaults/_ directory. We
+recommend to use a distinct schema foreach dump. Each dump creates filled table `algorithm` and `dataset` in the
+`public` schema. After import, you should move the public schema to a new schema.
 ```bash
 psql -f 1461_bank-marketing.sql
 psql -c "ALTER SCHEMA public RENAME TO 'd1461'"
