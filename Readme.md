@@ -1,7 +1,7 @@
 # Meta-Learning Base
 
 ## Installation
-This project requires Python 3.6, Docker and docker-compose. It consists of three different python projects:
+This project requires Python >= 3.6, Docker and docker-compose. It consists of three different python projects:
 - meta-learning-base
 - sklearn-components
 - pynisher
@@ -80,3 +80,36 @@ file.
 
 Get the pid of the worker via `ps aux | grep cli.py` and terminate the worker with SIGUSR1. On ubuntu this equals
 `kill -10 <PID>`. This will perform a graceful shutdown after the evaluation of the current algorithm is finished.
+
+
+## Exporting Regression Models
+
+There exist two methods to export the results of the meta-learning-base. To export all datasets meta-features use
+```bash
+python3 cli.py export_datasets
+```
+This command creates a file _export_datasets_{CHUNK}.pkl_. For performance reasons, exports are chunked to 500,000
+datasets.
+
+To export all pipelines use
+```bash
+python3 cli.py export_pipelines
+```
+This commands recursively combines the two tables _dataset_ and _algorithm_ to reconstruct all evaluated pipelines.
+Please note, that, depending on the number of actual algorithms and datasets, this actions requires a significant amount
+of time.
+
+Using the `train_scaler.py` script, all exported files are combined to train regression models on the expected pipeline
+performance.
+
+
+## Pretrained data
+
+For simplicity, we directly provide a [random forest regression model]() trained on all available data ready to use.
+Additionally, we provide database dumps for the evaluation of [30 datasets](). We recommend to use a distinct schema for
+each dump. Each dump creates filled table `algorithm` and `dataset` in the `public` schema. After import, you should move
+the public schema to a new schema.
+```bash
+psql -f 1461_bank-marketing.sql
+psql -c "ALTER SCHEMA public RENAME TO 'd1461'"
+```
