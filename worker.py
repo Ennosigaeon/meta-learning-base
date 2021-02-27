@@ -4,7 +4,6 @@ import traceback
 import warnings
 
 import pandas as pd
-import pynisher2
 import socket
 from builtins import object, str
 from datetime import datetime
@@ -18,6 +17,7 @@ from data import delete_data
 from database import Database, Algorithm
 from methods import ALGORITHMS, CLASSIFIERS
 from utilities import multiclass_roc_auc_score, logloss
+from automl import pynisher
 
 if TYPE_CHECKING:
     from core import Core
@@ -303,15 +303,15 @@ class Worker(object):
 
         # Transform the dataset and save the algorithm
         try:
-            wrapper = pynisher2.enforce_limits(wall_time_in_s=self.timeout, affinity=self.affinity,
+            wrapper = pynisher.enforce_limits(wall_time_in_s=self.timeout, affinity=self.affinity,
                                                logger=self.subprocess_logger)(self.transform_dataset)
             instance = algorithm.instance(params.get_dictionary())
             res = wrapper(instance)
-            if wrapper.exit_status is pynisher2.TimeoutException:
+            if wrapper.exit_status is pynisher.TimeoutException:
                 raise TimeoutError('Timeout')
-            elif wrapper.exit_status is pynisher2.MemorylimitException:
+            elif wrapper.exit_status is pynisher.MemorylimitException:
                 raise MemoryError('MemoryLimit')
-            elif wrapper.exit_status is pynisher2.AnythingException:
+            elif wrapper.exit_status is pynisher.AnythingException:
                 raise AlgorithmError(res[0], res[1])
             elif wrapper.exit_status == 0 and res is not None:
                 LOGGER.debug('Saving algorithm...')

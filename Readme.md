@@ -4,7 +4,6 @@
 This project requires Python >= 3.6, Docker and docker-compose. It consists of three different python projects:
 - meta-learning-base
 - sklearn-components
-- pynisher
 
 ```bash
 sudo apt-get install libatlas-base-dev libblas3 liblapack3 liblapack-dev libblas-dev gfortran
@@ -16,9 +15,6 @@ cd ..
 git clone https://gitlab.usu-research.ml/research/automl/sklearn-components.git
 sudo pip3 install -r sklearn-components/requirements.txt
 pip3 install -e sklearn-components
-
-git clone https://github.com/Ennosigaeon/pynisher.git
-pip3 install -e pynisher
 ```
 
 Install system-packages

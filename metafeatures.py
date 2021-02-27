@@ -9,7 +9,7 @@ from pymfe.info_theory import MFEInfoTheory
 from pymfe.model_based import MFEModelBased
 from pymfe.statistical import MFEStatistical
 
-import pynisher2
+from automl import pynisher
 
 LOGGER = logging.getLogger('mlb')
 
@@ -38,17 +38,17 @@ class MetaFeatures(object):
         :return:
         """
 
-        wrapper = pynisher2.enforce_limits(wall_time_in_s=self.mf_timeout, logger=self.subprocess_logger,
-                                           mem_in_mb=self.mf_memory)(self._calculate)
+        wrapper = pynisher.enforce_limits(wall_time_in_s=self.mf_timeout, logger=self.subprocess_logger,
+                                          mem_in_mb=self.mf_memory)(self._calculate)
         res = wrapper(df, class_column, max_nan_percentage=max_nan_percentage, max_features=max_features,
                       random_state=random_state)
-        if wrapper.exit_status is pynisher2.TimeoutException or wrapper.exit_status is pynisher2.MemorylimitException:
+        if wrapper.exit_status is pynisher.TimeoutException or wrapper.exit_status is pynisher.MemorylimitException:
             LOGGER.info('MF calculation violated constraints')
             return {
                        'nr_inst': df.shape[0],
                        'nr_attr': df.shape[1]
                    }, False
-        elif wrapper.exit_status is pynisher2.AnythingException:
+        elif wrapper.exit_status is pynisher.AnythingException:
             LOGGER.warning('Failed to extract MF due to {}'.format(res[0]))
             return {
                        'nr_inst': df.shape[0],
