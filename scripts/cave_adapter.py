@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sqlalchemy import create_engine
-from automl.components.classification import _classifiers
+from dswizard.components.classification import _classifiers
 from itertools import combinations
 from fanova import fANOVA
 from sklearn.model_selection import cross_validate

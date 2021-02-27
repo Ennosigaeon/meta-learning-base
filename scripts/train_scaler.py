@@ -11,7 +11,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, FunctionTransformer, RobustScaler
 
-from automl.util import util
+from dswizard.components import util
 
 warnings.filterwarnings("ignore", message="divide by zero encountered in divide")
 warnings.filterwarnings("ignore", message="divide by zero encountered")

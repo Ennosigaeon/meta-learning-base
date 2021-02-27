@@ -9,7 +9,7 @@ from pymfe.info_theory import MFEInfoTheory
 from pymfe.model_based import MFEModelBased
 from pymfe.statistical import MFEStatistical
 
-from automl import pynisher
+from dswizard import pynisher
 
 LOGGER = logging.getLogger('mlb')
 

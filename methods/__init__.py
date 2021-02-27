@@ -1,9 +1,9 @@
 from typing import Dict, Type
 
-from automl.components.base import EstimatorComponent
-from automl.components.classification import ClassifierChoice
-from automl.components.data_preprocessing import DataPreprocessorChoice
-from automl.components.feature_preprocessing import FeaturePreprocessorChoice
+from dswizard.components.base import EstimatorComponent
+from dswizard.components.classification import ClassifierChoice
+from dswizard.components.data_preprocessing import DataPreprocessorChoice
+from dswizard.components.feature_preprocessing import FeaturePreprocessorChoice
 
 """Generates dict with all available Algorithms from sklearn-components"""
 ALGORITHMS: Dict[str, Type[EstimatorComponent]] = {}

@@ -17,7 +17,7 @@ from data import delete_data
 from database import Database, Algorithm
 from methods import ALGORITHMS, CLASSIFIERS
 from utilities import multiclass_roc_auc_score, logloss
-from automl import pynisher
+from dswizard import pynisher
 
 if TYPE_CHECKING:
     from core import Core
