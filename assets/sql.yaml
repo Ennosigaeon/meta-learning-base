@@ -1,6 +1,6 @@
 # LOKAL
 dialect: 'postgres'
-database: 'postgres'
+database: 'default'
 username: 'postgres'
 password: 'postgres'
 host: 'localhost'
